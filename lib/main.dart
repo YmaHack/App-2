@@ -170,7 +170,7 @@ class SongTile extends StatelessWidget{
     Container(width:46,height:46,decoration:BoxDecoration(color:accent.withOpacity(.13),borderRadius:BorderRadius.circular(14)),child:const Icon(Icons.music_note,color:accent)),
     const SizedBox(width:12),Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text(song.title,style:const TextStyle(fontWeight:FontWeight.bold,fontSize:16)),const SizedBox(height:4),Text(song.style+'  •  '+(song.artist.isEmpty?'ללא אמן':song.artist),style:const TextStyle(color:soft,fontSize:12))])),
     Text(song.key,style:const TextStyle(color:chord,fontWeight:FontWeight.w800))
-  ])));
+  ]))));
 }
 
 class Player extends StatefulWidget{
@@ -260,7 +260,7 @@ class _EditorState extends State<Editor>{
     const SizedBox(height:14),const Text('תוכן השיר',style:TextStyle(fontWeight:FontWeight.bold)),const SizedBox(height:5),const Text('אפשר להדביק [Am]מילים, או שורות אקורדים כמו Am F C G. המערכת מזהה אותיות באנגלית כאקורדים.',style:TextStyle(color:soft,fontSize:12)),
     const SizedBox(height:8),TextField(controller:body,minLines:20,maxLines:35,style:const TextStyle(height:1.55),decoration:const InputDecoration(hintText:'# בית\n[Am]מילים כאן...\n\n# פזמון\n[C]הפזמון...')),
     const SizedBox(height:12),FilledButton.tonalIcon(onPressed:importFile,icon:const Icon(Icons.upload_file),label:const Text('ייבוא TXT / PDF')),const SizedBox(height:8),FilledButton.icon(onPressed:save,icon:const Icon(Icons.save),label:const Text('שמור שיר'))
-  ]);
+  ]));
 }
 
 class Info extends StatelessWidget{final Store store;const Info({super.key,required this.store});@override Widget build(BuildContext c)=>Scaffold(appBar:AppBar(title:const Text('מידע')),body:ListView(padding:const EdgeInsets.all(16),children:[
