@@ -8,12 +8,21 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:syncfusion_flutter_pdf/pdf.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:tesseract_ocr/tesseract_ocr.dart';
+import 'package:tesseract_ocr/ocr_engine_config.dart';
+import 'package:pdfx/pdfx.dart' as pdfx;
+import 'package:path_provider/path_provider.dart';
 
 const bg=Color(0xFF0B1020), card=Color(0xFF151D33), accent=Color(0xFF5DE4C7), accent2=Color(0xFF7C83FD), soft=Color(0xFF9BA8C4), chord=Color(0xFFFFD166);
 ThemeData appTheme(int t){
-  const seeds=[accent2,Color(0xFF2F80ED),Color(0xFFE85D75),Color(0xFFFFA94D),Color(0xFF20C997)];
-  if(t==1)return ThemeData(brightness:Brightness.light,colorScheme:ColorScheme.fromSeed(seedColor:seeds[t],brightness:Brightness.light),scaffoldBackgroundColor:Color(0xFFF4F6FA),useMaterial3:true);
-  return ThemeData(brightness:Brightness.dark,colorScheme:ColorScheme.fromSeed(seedColor:seeds[t],brightness:Brightness.dark),scaffoldBackgroundColor:t==3?Color(0xFF1B1410):bg,useMaterial3:true);
+  const seeds=[Color(0xFF6C63FF),Color(0xFF1976D2),Color(0xFF00A6D6),Color(0xFFE56B3F),Color(0xFF14B89B)];
+  final light=t==1;
+  final scheme=ColorScheme.fromSeed(seedColor:seeds[t],brightness:light?Brightness.light:Brightness.dark,contrastLevel:.1);
+  final base=ThemeData(useMaterial3:true,brightness:light?Brightness.light:Brightness.dark,colorScheme:scheme,scaffoldBackgroundColor:light?const Color(0xFFF3F5FA):t==3?const Color(0xFF17100C):const Color(0xFF080C16),cardColor:light?Colors.white:const Color(0xFF141B2A));
+  return base.copyWith(
+    navigationBarTheme:NavigationBarThemeData(backgroundColor:light?Colors.white:const Color(0xFF0E1422),indicatorColor:scheme.primaryContainer),
+    inputDecorationTheme:InputDecorationTheme(filled:true,fillColor:light?const Color(0xFFF8F9FC):const Color(0xFF101726),border:OutlineInputBorder(borderRadius:BorderRadius.circular(16),borderSide:BorderSide.none)),
+  );
 }
 String themeName(int t)=>['לילה סגול','בהיר','כחול עמוק','חם','טורקיז'][t];
 
@@ -371,20 +380,18 @@ class ChordAboveLine extends StatelessWidget{
   const ChordAboveLine({super.key,required this.line,required this.size,required this.tr});
   @override Widget build(BuildContext c){
     final matches=RegExp(r'\[([A-G](?:#|b)?(?:m|maj7|maj|m7|7|sus4|sus|dim|aug|add9|9|11|13)?(?:/[A-G](?:#|b)?)?)\]([^[]*)').allMatches(line).toList();
-    if(matches.isEmpty)return Text(line,style:TextStyle(fontSize:size,height:1.55));
-    final children=<Widget>[];
-    var last=0;
+    if(matches.isEmpty)return Align(alignment:Alignment.centerRight,child:Text(line,textDirection:TextDirection.rtl,textAlign:TextAlign.right,style:TextStyle(fontSize:size,height:1.55)));
+    final children=<Widget>[];var last=0;
     for(final m in matches){
-      if(m.start>last){children.add(Text(line.substring(last,m.start),style:TextStyle(fontSize:size,height:1.55)));}
-      final text=m.group(2)!;
-      children.add(Column(mainAxisSize:MainAxisSize.min,crossAxisAlignment:CrossAxisAlignment.start,children:[
-        Text(shift(m.group(1)!,tr),style:TextStyle(color:chord,fontWeight:FontWeight.w900,fontSize:size*.72,height:1.0)),
-        Text(text,style:TextStyle(fontSize:size,height:1.35)),
+      if(m.start>last)children.add(Text(line.substring(last,m.start),textDirection:TextDirection.rtl,textAlign:TextAlign.right,style:TextStyle(fontSize:size,height:1.55)));
+      children.add(Column(mainAxisSize:MainAxisSize.min,crossAxisAlignment:CrossAxisAlignment.end,children:[
+        Text(shift(m.group(1)!,tr),textDirection:TextDirection.ltr,style:TextStyle(color:chord,fontWeight:FontWeight.w900,fontSize:size*.72,height:1)),
+        Text(m.group(2)!,textDirection:TextDirection.rtl,textAlign:TextAlign.right,style:TextStyle(fontSize:size,height:1.35)),
       ]));
       last=m.end;
     }
-    if(last<line.length)children.add(Text(line.substring(last),style:TextStyle(fontSize:size,height:1.55)));
-    return Wrap(textDirection:TextDirection.rtl,crossAxisAlignment:WrapCrossAlignment.end,spacing:2,runSpacing:0,children:children);
+    if(last<line.length)children.add(Text(line.substring(last),textDirection:TextDirection.rtl,textAlign:TextAlign.right,style:TextStyle(fontSize:size,height:1.55)));
+    return Directionality(textDirection:TextDirection.rtl,child:Align(alignment:Alignment.centerRight,child:Wrap(textDirection:TextDirection.rtl,alignment:WrapAlignment.start,crossAxisAlignment:WrapCrossAlignment.end,spacing:4,runSpacing:0,children:children)));
   }
 }
 final chordRx=RegExp(r'\[([A-G](?:#|b)?(?:m|maj7|maj|m7|7|sus4|sus|dim|aug|add9|9|11|13)?(?:/[A-G](?:#|b)?)?)\]|(?<![A-Za-z])([A-G](?:#|b)?(?:m|maj7|maj|m7|7|sus4|sus|dim|aug|add9|9|11|13)?(?:/[A-G](?:#|b)?)?)(?![A-Za-z])');
@@ -409,7 +416,7 @@ class _EditorState extends State<Editor>{
     const SizedBox(height:10),Row(children:[Expanded(child:TextField(controller:artist,decoration:const InputDecoration(labelText:'אמן'))),const SizedBox(width:8),Expanded(child:TextField(controller:style,decoration:const InputDecoration(labelText:'סגנון')))]),
     const SizedBox(height:8),Row(children:[Expanded(child:TextField(controller:key,decoration:const InputDecoration(labelText:'סולם'))),const SizedBox(width:8),if(widget.song==null&&widget.store.lists.isNotEmpty)Expanded(child:DropdownButtonFormField<String>(initialValue:listId,decoration:const InputDecoration(labelText:'רשימת הופעה'),items:widget.store.lists.map((x)=>DropdownMenuItem(value:x.id,child:Text(x.name,overflow:TextOverflow.ellipsis))).toList(),onChanged:(v)=>setState(()=>listId=v)))]),
     const SizedBox(height:14),const Text('תוכן השיר',style:TextStyle(fontWeight:FontWeight.bold)),const SizedBox(height:5),const Text('אפשר להדביק [Am]מילים, או שורות אקורדים כמו Am F C G. המערכת מזהה אותיות באנגלית כאקורדים.',style:TextStyle(color:soft,fontSize:12)),
-    const SizedBox(height:8),TextField(controller:body,minLines:20,maxLines:35,style:const TextStyle(height:1.55),decoration:const InputDecoration(hintText:'# בית\n[Am]מילים כאן...\n\n# פזמון\n[C]הפזמון...')),
+    const SizedBox(height:8),TextField(controller:body,textDirection:TextDirection.rtl,textAlign:TextAlign.right,minLines:20,maxLines:35,style:const TextStyle(height:1.55),decoration:const InputDecoration(hintText:'# בית\n[Am]מילים כאן...\n\n# פזמון\n[C]הפזמון...')),
     const SizedBox(height:12),FilledButton.tonalIcon(onPressed:importFile,icon:const Icon(Icons.upload_file),label:const Text('ייבוא TXT / PDF')),const SizedBox(height:8),FilledButton.icon(onPressed:save,icon:const Icon(Icons.save),label:const Text('שמור שיר'))
   ]));
 }
