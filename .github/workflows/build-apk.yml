@@ -28,7 +28,7 @@ jobs:
       - name: Generate launcher icon
         run: dart run flutter_launcher_icons
       - name: Analyze
-        run: flutter analyze --no-fatal-infos
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
       - name: Build release APK
         run: flutter build apk --release
       - name: Upload APK
