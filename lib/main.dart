@@ -353,11 +353,8 @@ class _PlayerState extends State<Player>{
           ])
         ),
         SizedBox(height:48,child:ListView.separated(scrollDirection:Axis.horizontal,padding:const EdgeInsets.symmetric(horizontal:12,vertical:6),itemCount:sec.length,separatorBuilder:(_,__)=>const SizedBox(width:6),itemBuilder:(_,i)=>ActionChip(label:Text(sec[i].name),onPressed:()=>Scrollable.ensureVisible(keys[i].currentContext!,duration:const Duration(milliseconds:300),curve:Curves.easeOut)))),
-        Expanded(child:ListView.builder(
-          controller:sc,padding:const EdgeInsets.fromLTRB(15,5,15,80),
-          itemCount:sec.length,
-          itemBuilder:(_,i)=>KeyedSubtree(key:keys[i],child:SectionView(section:sec[i],size:size,tr:tr))
-        ))
+        Expanded(child:Scrollbar(controller:sc,thumbVisibility:true,interactive:true,child:ListView.builder(controller:sc,physics:const BouncingScrollPhysics(parent:AlwaysScrollableScrollPhysics()),keyboardDismissBehavior:ScrollViewKeyboardDismissBehavior.onDrag,cacheExtent:1400,padding:const EdgeInsets.fromLTRB(14,5,14,96),itemCount:sec.length,itemBuilder:(_,i)=>KeyedSubtree(key:keys[i],child:SectionView(section:sec[i],size:size,tr:tr)))));
+
       ])
     );
   }
