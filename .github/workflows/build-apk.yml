@@ -18,10 +18,15 @@ jobs:
         run: flutter create --no-pub --platforms=android --project-name=bama --org=com.ymahack .
       - name: Remove generated sample tests
         run: rm -rf test
+      - name: Convert logo to PNG
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y librsvg2-bin
+          rsvg-convert assets/logo.svg -o assets/logo.png -w 1024 -h 1024
       - name: Get packages
         run: flutter pub get
       - name: Generate launcher icon
-        run: dart run launcher_icons
+        run: dart run flutter_launcher_icons
       - name: Analyze
         run: flutter analyze --no-fatal-infos
       - name: Build release APK
