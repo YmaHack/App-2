@@ -444,8 +444,12 @@ String extractPdfSmart(List<int> bytes){
   }finally{d.dispose();}
 }
 bool containsHebrew(String s)=>RegExp(r'[\u0590-\u05FF]').hasMatch(s);
-bool looksLikeChordLine(String s){final t=s.replaceAll(RegExp(r'[|,;]'),' ').split(RegExp(r'\s+')).where((x)=>x.isNotEmpty).toList();if(t.isEmpty||t.length>18)return false;return t.where((x)=>isChord(x.replaceAll(RegExp(r'x\d+$'),'')).length/t.length>=.65;}
-String attachChords(List<TextWord> chords,List<TextWord> lyrics,bool heb){final w=[...lyrics]..sort((x,y)=>heb?y.bounds.left.compareTo(x.bounds.left):x.bounds.left.compareTo(y.bounds.left));final at=<int,List<String>>{};for(final ch in chords){final x=ch.bounds.center.dx;int best=0;double dist=double.infinity;for(int i=0;i<w.length;i++){final z=w[i],d=x<z.bounds.left?z.bounds.left-x:x>z.bounds.right?x-z.bounds.right:0;if(d<dist){dist=d;best=i;}}at.putIfAbsent(best,()=>[]).add(ch.text);}final out=StringBuffer();for(int i=0;i<w.length;i++){if(i>0)out.write(' ');for(final c in at[i]??const <String>[]){out.write('[');out.write(c);out.write(']');}out.write(w[i].text);}return out.toString();}
+bool looksLikeChordLine(String s){
+ final t=s.replaceAll(RegExp(r'[|,;]'),' ').split(RegExp(r'\\s+')).where((x)=>x.isNotEmpty).toList();
+ if(t.isEmpty||t.length>18)return false;
+ final n=t.where((x)=>isChord(x.replaceAll(RegExp(r'x\\d+$'),''))).length;
+ return n/t.length>=.65;
+}
 Future<String> smartExtractFile(String? path,List<int> bytes,String extension)async{
  final e=extension.toLowerCase();
  if(e=='txt')return normalize(utf8.decode(bytes,allowMalformed:true));
