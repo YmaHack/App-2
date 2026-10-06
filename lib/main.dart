@@ -8,8 +8,6 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:syncfusion_flutter_pdf/pdf.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:flutter_tesseract_ocr/flutter_tesseract_ocr.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:pdf_image_renderer/pdf_image_renderer.dart';
 
 const bg=Color(0xFF0B1020), card=Color(0xFF151D33), accent=Color(0xFF5DE4C7), accent2=Color(0xFF7C83FD), soft=Color(0xFF9BA8C4), chord=Color(0xFFFFD166);
@@ -460,10 +458,7 @@ Future<String> smartExtractFile(String? path,List<int> bytes,String extension)as
  final e=extension.toLowerCase();
  if(e=='txt')return normalize(utf8.decode(bytes,allowMalformed:true));
  if(e=='pdf'){final d=PdfDocument(inputBytes:bytes);try{return normalize(PdfTextExtractor(d).extractText());}finally{d.dispose();}}
- final dir=await getTemporaryDirectory();
- final f=File(dir.path+'/bama_ocr_'+DateTime.now().microsecondsSinceEpoch.toString()+'.'+e);
- await f.writeAsBytes(bytes,flush:true);
- try{return normalize(await FlutterTesseractOcr.extractText(f.path,language:'heb+eng',args:{'psm':'6'}));}finally{if(await f.exists())await f.delete();}
+ throw Exception('סריקת תמונות דורשת מנוע OCR ייעודי שעדיין לא הופעל בגרסה זו');
 }
 List<String> parseSongList(String raw){final out=<String>[];for(final line in raw.replaceAll('\r','').split('\n')){var x=line.trim();if(x.isEmpty)continue;x=x.replaceFirst(RegExp(r'^\s*(?:\d+[.)\-:]|[-•])\s*'),'');if(isChord(x)||looksLikeChordLine(x)||x.length>90)continue;if(RegExp(r'^(רשימת שירים|שירים|playlist|setlist)$',caseSensitive:false).hasMatch(x))continue;if(!out.contains(x))out.add(x);}return out;}
 String baseName(String path)=>path.split(Platform.pathSeparator).last.replaceFirst(RegExp(r'\.(txt|pdf|jpg|jpeg|png|webp|bmp)$',caseSensitive:false),'');
