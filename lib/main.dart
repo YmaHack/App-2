@@ -8,7 +8,6 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:syncfusion_flutter_pdf/pdf.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:pdf_image_renderer/pdf_image_renderer.dart';
 
 const bg=Color(0xFF0B1020), card=Color(0xFF151D33), accent=Color(0xFF5DE4C7), accent2=Color(0xFF7C83FD), soft=Color(0xFF9BA8C4), chord=Color(0xFFFFD166);
 ThemeData appTheme(int t){
