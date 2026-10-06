@@ -140,7 +140,7 @@ class _LibraryState extends State<Library>{
       }else{text=utf8.decode(f.bytes!,allowMalformed:true);}
       final s=Song(uid(),f.name.replaceFirst(RegExp(r'\.[^.]+$'),''),folder!, 'C',Converter.convert(text));
       if(!mounted)return;
-      await Navigator.push(context,MaterialPageRoute(builder:(_)=>Editor(widget.store,s,true)));
+      await Navigator.push(context,MaterialPageRoute(builder:(_)=>Editor(widget.store,s,isNew:true)));
       setState((){});
     }catch(e){if(mounted)snack('הייבוא נכשל: '+e.toString());}
   }
@@ -188,7 +188,7 @@ class _LibraryState extends State<Library>{
 
 class Editor extends StatefulWidget{
   final Store store; final Song song; final bool isNew;
-  const Editor(this.store,this.song,[this.isNew=false],{super.key});
+  const Editor(this.store,this.song,{super.key,this.isNew=false});
   @override State<Editor> createState()=>_EditorState();
 }
 class _EditorState extends State<Editor>{
