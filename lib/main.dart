@@ -354,7 +354,25 @@ class _PlayerState extends State<Player>{
           ])
         ),
         SizedBox(height:48,child:ListView.separated(scrollDirection:Axis.horizontal,padding:const EdgeInsets.symmetric(horizontal:12,vertical:6),itemCount:sec.length,separatorBuilder:(_,__)=>const SizedBox(width:6),itemBuilder:(_,i)=>ActionChip(label:Text(sec[i].name),onPressed:()=>Scrollable.ensureVisible(keys[i].currentContext!,duration:const Duration(milliseconds:300),curve:Curves.easeOut)))),
-        Expanded(child:Scrollbar(controller:sc,thumbVisibility:true,interactive:true,child:ListView.builder(controller:sc,physics:const BouncingScrollPhysics(parent:AlwaysScrollableScrollPhysics()),keyboardDismissBehavior:ScrollViewKeyboardDismissBehavior.onDrag,cacheExtent:1400,padding:const EdgeInsets.fromLTRB(14,5,14,96),itemCount:sec.length,itemBuilder:(_,i)=>KeyedSubtree(key:keys[i],child:SectionView(section:sec[i],size:size,tr:tr)))));
+        Expanded(
+          child:Scrollbar(
+            controller:sc,
+            thumbVisibility:true,
+            interactive:true,
+            child:ListView.builder(
+              controller:sc,
+              physics:const BouncingScrollPhysics(parent:AlwaysScrollableScrollPhysics()),
+              keyboardDismissBehavior:ScrollViewKeyboardDismissBehavior.onDrag,
+              cacheExtent:1400,
+              padding:const EdgeInsets.fromLTRB(14,5,14,96),
+              itemCount:sec.length,
+              itemBuilder:(_,i)=>KeyedSubtree(
+                key:keys[i],
+                child:SectionView(section:sec[i],size:size,tr:tr),
+              ),
+            ),
+          ),
+        )
 
       ])
     );
@@ -566,10 +584,10 @@ Future<String> _ocrPdf(List<int> bytes)async{
     for(int pageNo=1;pageNo<=document.pagesCount;pageNo++){
       final page=await document.getPage(pageNo);
       try{
-        final image=await page.render(width:page.width*2,height:page.height*2,format:pdfx.PdfPageImageFormat.PNG);
+        final image=await page.render(width:page.width*2,height:page.height*2,format:pdfx.PdfPageImageFormat.png);
         final dir=await getTemporaryDirectory();
         final file=File('\${dir.path}/bama_pdf_\${DateTime.now().microsecondsSinceEpoch}_$pageNo.png');
-        await file.writeAsBytes(image.bytes,flush:true);
+        await file.writeAsBytes(image.bytes!,flush:true);
         try{out.add(await _ocrImageFile(file));}finally{if(await file.exists())await file.delete();}
       }finally{await page.close();}
     }
@@ -587,6 +605,25 @@ Future<String> smartExtractFile(String? path,List<int> bytes,String extension)as
   if(['jpg','jpeg','png','webp','bmp'].contains(e))return await _ocrImageBytes(bytes,e=='jpg'||e=='jpeg'?'jpg':'png');
   throw Exception('פורמט קובץ לא נתמך');
 }
+List<String> parseSongList(String raw){
+  final out=<String>[];
+  for(final line in raw.replaceAll('\r','').split('\n')){
+    var x=line.trim();
+    if(x.isEmpty)continue;
+    x=x.replaceFirst(RegExp(r'^\s*(?:\d+[.)\-:]|[-•])\s*'),'');
+    if(isChord(x)||looksLikeChordLine(x)||x.length>90)continue;
+    if(RegExp(r'^(רשימת שירים|שירים|playlist|setlist)$',caseSensitive:false).hasMatch(x))continue;
+    if(!out.contains(x))out.add(x);
+  }
+  return out;
+}
+String baseName(String path)=>path.split(Platform.pathSeparator).last.replaceFirst(RegExp(r'\.(txt|pdf|jpg|jpeg|png|webp|bmp)$',caseSensitive:false),'');
+String inferStyle(String path,List<String> styles){
+  final p=path.toLowerCase();
+  for(final s in styles){if(s!='כללי'&&p.contains(s.toLowerCase()))return s;}
+  return 'כללי';
+}
+
 class SmartImport extends StatefulWidget{
   final Store store;final String mode;
   const SmartImport({super.key,required this.store,required this.mode});
