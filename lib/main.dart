@@ -87,7 +87,8 @@ class Lists extends StatelessWidget{
 }
 
 class SetlistView extends StatefulWidget{
-  final Store store;final Setlist list;const SetlistView({super.key,required this.store,required this.list});
+  final Store store; final Setlist list;
+  const SetlistView({super.key,required this.store,required this.list});
   @override State<SetlistView> createState()=>_SetlistViewState();
 }
 class _SetlistViewState extends State<SetlistView>{
@@ -96,12 +97,28 @@ class _SetlistViewState extends State<SetlistView>{
     final all=widget.list.ids.map(widget.store.song).whereType<Song>().toList();
     final styles=['הכל',...all.map((x)=>x.style).toSet()];
     final shown=all.where((x)=>style=='הכל'||x.style==style).toList();
-    return Scaffold(appBar:AppBar(title:Text(widget.list.name),actions:[IconButton(onPressed:()=>showModalBottomSheet(context:c,isScrollControlled:true,builder:(_)=>AddSongs(store:widget.store,list:widget.list)),icon:const Icon(Icons.playlist_add))]),
-      floatingActionButton:FloatingActionButton.extended(onPressed:()=>showModalBottomSheet(context:c,isScrollControlled:true,builder:(_)=>AddSongs(store:widget.store,list:widget.list)),icon:const Icon(Icons.add),label:const Text('הוסף')),
+    return Scaffold(
+      appBar:AppBar(title:Text(widget.list.name),actions:[
+        IconButton(onPressed:()=>showModalBottomSheet(context:c,isScrollControlled:true,builder:(_)=>AddSongs(store:widget.store,list:widget.list)),icon:const Icon(Icons.playlist_add))
+      ]),
+      floatingActionButton:FloatingActionButton.extended(
+        onPressed:()=>showModalBottomSheet(context:c,isScrollControlled:true,builder:(_)=>AddSongs(store:widget.store,list:widget.list)),
+        icon:const Icon(Icons.add),label:const Text('הוסף')),
       body:Column(children:[
-        SizedBox(height:60,child:ListView.separated(scrollDirection:Axis.horizontal,padding:const EdgeInsets.symmetric(horizontal:14,vertical:9),itemCount:styles.length,separatorBuilder:(_,__)=>const SizedBox(width:7),itemBuilder:(_,i)=>ChoiceChip(label:Text(styles[i]),selected:style==styles[i],onSelected:(_)=>setState(()=>style=styles[i])))),
-        Expanded(child:ListView.separated(padding:const EdgeInsets.fromLTRB(14,5,14,90),itemCount:shown.length,separatorBuilder:(_,__)=>const SizedBox(height:9),itemBuilder:(_,i)=>SongTile(song:shown[i],onTap:()=>Navigator.push(c,MaterialPageRoute(builder:(_)=>Player(store:widget.store,song:shown[i]))))))
-      ]));
+        SizedBox(height:60,child:ListView.separated(
+          scrollDirection:Axis.horizontal,padding:const EdgeInsets.symmetric(horizontal:14,vertical:9),
+          itemCount:styles.length,separatorBuilder:(_,__)=>const SizedBox(width:7),
+          itemBuilder:(_,i)=>ChoiceChip(label:Text(styles[i]),selected:style==styles[i],onSelected:(_)=>setState(()=>style=styles[i]))
+        )),
+        Expanded(child:ListView.separated(
+          padding:const EdgeInsets.fromLTRB(14,5,14,90),itemCount:shown.length,separatorBuilder:(_,__)=>const SizedBox(height:9),
+          itemBuilder:(_,i){
+            final song=shown[i];
+            return SongTile(song:song,onTap:()=>Navigator.push(c,MaterialPageRoute(builder:(_)=>Player(store:widget.store,song:song))));
+          }
+        ))
+      ])
+    );
   }
 }
 
