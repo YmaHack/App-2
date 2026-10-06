@@ -23,6 +23,17 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y librsvg2-bin
           rsvg-convert assets/logo.svg -o assets/logo.png -w 1024 -h 1024
+      - name: Enable internet permission for OCR
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('android/app/src/main/AndroidManifest.xml')
+          s=p.read_text()
+          perm='<uses-permission android:name="android.permission.INTERNET"/>'
+          if perm not in s:
+              s=s.replace('>', '>\\n    '+perm, 1)
+          p.write_text(s)
+          PY
       - name: Get packages
         run: flutter pub get
       - name: Generate launcher icon
