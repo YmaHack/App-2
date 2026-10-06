@@ -85,13 +85,37 @@ class _HomeState extends State<Home>{
 }
 
 class Dashboard extends StatelessWidget{
-  final Store store;const Dashboard({super.key,required this.store});
-  @override Widget build(BuildContext c)=>Scaffold(appBar:AppBar(title:Row(children:const[LogoMark(size:38),SizedBox(width:10),Text('במה',style:TextStyle(fontWeight:FontWeight.w900))])),body:ListView(padding:const EdgeInsets.all(16),children:[
-    const Text('מוכנים להופעה?',style:TextStyle(fontSize:28,fontWeight:FontWeight.w900)),const SizedBox(height:6),const Text('ניהול מהיר של הופעות, רשימות ושירים.',style:TextStyle(color:soft)),const SizedBox(height:18),
-    Row(children:[Expanded(child:Card(child:ListTile(leading:const Icon(Icons.view_list,color:accent),title:Text('${store.lists.length}',style:const TextStyle(fontSize:23,fontWeight:FontWeight.w900)),subtitle:const Text('רשימות')))),const SizedBox(width:10),Expanded(child:Card(child:ListTile(leading:const Icon(Icons.music_note,color:accent),title:Text('${store.songs.length}',style:const TextStyle(fontSize:23,fontWeight:FontWeight.w900)),subtitle:const Text('שירים'))))]),
-    const SizedBox(height:12),const Text('רשימות אחרונות',style:TextStyle(fontSize:20,fontWeight:FontWeight.w800)),const SizedBox(height:7),
-    ...store.lists.take(5).map((l)=>Card(child:ListTile(leading:const Icon(Icons.queue_music,color:accent),title:Text(l.name,style:const TextStyle(fontWeight:FontWeight.bold)),subtitle:Text('${l.ids.length} שירים'),trailing:const Icon(Icons.chevron_left),onTap:()=>Navigator.push(c,MaterialPageRoute(builder:(_)=>SetlistView(store:store,list:l))))),
-  ]));
+  final Store store;
+  const Dashboard({super.key,required this.store});
+  @override Widget build(BuildContext c){
+    return Scaffold(
+      appBar:AppBar(title:Row(children:const[LogoMark(size:38),SizedBox(width:10),Text('במה',style:TextStyle(fontWeight:FontWeight.w900))])),
+      body:ListView(
+        padding:const EdgeInsets.all(16),
+        children:[
+          const Text('מוכנים להופעה?',style:TextStyle(fontSize:28,fontWeight:FontWeight.w900)),
+          const SizedBox(height:6),
+          const Text('ניהול מהיר של הופעות, רשימות ושירים.',style:TextStyle(color:soft)),
+          const SizedBox(height:18),
+          Row(children:[
+            Expanded(child:Card(child:ListTile(leading:const Icon(Icons.view_list,color:accent),title:Text(store.lists.length.toString(),style:const TextStyle(fontSize:23,fontWeight:FontWeight.w900)),subtitle:const Text('רשימות')))),
+            const SizedBox(width:10),
+            Expanded(child:Card(child:ListTile(leading:const Icon(Icons.music_note,color:accent),title:Text(store.songs.length.toString(),style:const TextStyle(fontSize:23,fontWeight:FontWeight.w900)),subtitle:const Text('שירים')))),
+          ]),
+          const SizedBox(height:12),
+          const Text('רשימות אחרונות',style:TextStyle(fontSize:20,fontWeight:FontWeight.w800)),
+          const SizedBox(height:7),
+          ...store.lists.take(5).map((l)=>Card(child:ListTile(
+            leading:const Icon(Icons.queue_music,color:accent),
+            title:Text(l.name,style:const TextStyle(fontWeight:FontWeight.bold)),
+            subtitle:Text(l.ids.length.toString()+' שירים'),
+            trailing:const Icon(Icons.chevron_left),
+            onTap:()=>Navigator.push(c,MaterialPageRoute(builder:(_)=>SetlistView(store:store,list:l))),
+          ))),
+        ],
+      ),
+    );
+  }
 }
 class Lists extends StatelessWidget{
   final Store store; const Lists({super.key,required this.store});
@@ -357,7 +381,7 @@ String attachChords(List<TextWord> chords,List<TextWord> lyrics,bool heb){
     int best=0;double dist=double.infinity;
     for(int i=0;i<w.length;i++){
       final z=w[i];
-      final d=x<z.bounds.left?z.bounds.left-x:x>z.bounds.right?x-z.bounds.right:0;
+      final double d=x<z.bounds.left?z.bounds.left-x:x>z.bounds.right?x-z.bounds.right:0;
       if(d<dist){dist=d;best=i;}
     }
     at.putIfAbsent(best,()=>[]).add(ch.text);
@@ -448,7 +472,7 @@ class _SmartImportState extends State<SmartImport>{
       const SizedBox(height:22),
       if(busy)const CircularProgressIndicator() else FilledButton.icon(onPressed:scan,icon:const Icon(Icons.folder_open),label:const Text('בחר תיקייה')),
       if(status.isNotEmpty)Padding(padding:const EdgeInsets.only(top:16),child:Text(status,style:const TextStyle(color:soft))),
-    ])),
+    ]))),
   );
 }
 
