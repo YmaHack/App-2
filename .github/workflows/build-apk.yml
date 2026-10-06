@@ -18,6 +18,9 @@ jobs:
           channel: stable
           cache: true
 
+      - name: Generate Android project files
+        run: flutter create --no-pub --platforms=android --project-name=bama --org=com.ymahack .
+
       - name: Install dependencies
         run: flutter pub get
 
