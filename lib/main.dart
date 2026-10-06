@@ -22,8 +22,9 @@ class App extends StatelessWidget {
   const App({super.key,required this.store});
   @override Widget build(BuildContext c)=>MaterialApp(
     debugShowCheckedModeBanner:false,title:'במה',
+    home:AnimatedBuilder(animation:store,builder:(_,__)=>Directionality(textDirection:TextDirection.rtl,child:Home(store:store))),
     theme:appTheme(store.theme),
-    home:Directionality(textDirection:TextDirection.rtl,child:Home(store:store)),
+    home:AnimatedBuilder(animation:store,builder:(_,__)=>Directionality(textDirection:TextDirection.rtl,child:Home(store:store))),
   );
 }
 
@@ -34,21 +35,27 @@ class Song {
   factory Song.fromJson(Map<String,dynamic> j)=>Song(id:j['id']??uid(),title:j['title']??'שיר',artist:j['artist']??'',style:j['style']??'כללי',key:j['key']??'C',text:j['text']??'');
 }
 class Setlist {
-  String id,name; List<String> ids;
-  Setlist({required this.id,required this.name,this.ids=const[]});
-  Map<String,dynamic> toJson()=>{'id':id,'name':name,'ids':ids};
-  factory Setlist.fromJson(Map<String,dynamic> j)=>Setlist(id:j['id']??uid(),name:j['name']??'רשימה',ids:List<String>.from(j['ids']??[]));
+  String id,name,folderId; List<String> ids,names;
+  Setlist({required this.id,required this.name,this.ids=const[],this.names=const[],this.folderId=''}) ;
+  Map<String,dynamic> toJson()=>{'id':id,'name':name,'ids':ids,'names':names,'folderId':folderId};
+  factory Setlist.fromJson(Map<String,dynamic> j)=>Setlist(id:j['id']??uid(),name:j['name']??'פלייליסט',ids:List<String>.from(j['ids']??[]),names:List<String>.from(j['names']??[]),folderId:j['folderId']??'');
+}
+class Folder {
+  String id,name,parentId;
+  Folder({required this.id,required this.name,this.parentId='' });
+  Map<String,dynamic> toJson()=>{'id':id,'name':name,'parentId':parentId};
+  factory Folder.fromJson(Map<String,dynamic> j)=>Folder(id:j['id']??uid(),name:j['name']??'תיקייה',parentId:j['parentId']??'');
 }
 String uid()=>DateTime.now().microsecondsSinceEpoch.toString()+math.Random().nextInt(999).toString();
 
 class Store extends ChangeNotifier {
-  List<Song> songs=[]; List<Setlist> lists=[]; List<String> styles=['חסידי','שקט','קצבי','מזרחי','כללי']; int theme=0;
+  List<Song> songs=[]; List<Setlist> lists=[]; List<Folder> folders=[]; List<String> styles=['חסידי','שקט','קצבי','מזרחי','כללי']; int theme=0;
   Future<void> load() async {
-    final p=await SharedPreferences.getInstance(), raw=p.getString('bama_v3');
+    final p=await SharedPreferences.getInstance(), raw=p.getString('bama_v4') ?? p.getString('bama_v3');
     if(raw==null){ songs=demo(); lists=[Setlist(id:uid(),name:'הופעה – יום שישי',ids:songs.map((x)=>x.id).toList()),Setlist(id:uid(),name:'חזרות',ids:songs.take(2).map((x)=>x.id).toList())]; await save(); }
-    else { final j=jsonDecode(raw); songs=(j['songs'] as List? ?? []).map((x)=>Song.fromJson(x)).toList(); lists=(j['lists'] as List? ?? []).map((x)=>Setlist.fromJson(x)).toList(); styles=List<String>.from(j['styles']??styles); theme=j['theme']??0; }
+    else { final j=jsonDecode(raw); songs=(j['songs'] as List? ?? []).map((x)=>Song.fromJson(x)).toList(); lists=(j['lists'] as List? ?? []).map((x)=>Setlist.fromJson(x)).toList(); folders=(j['folders'] as List? ?? []).map((x)=>Folder.fromJson(x)).toList(); styles=List<String>.from(j['styles']??styles); theme=j['theme']??0; }
   }
-  Future<void> save() async { final p=await SharedPreferences.getInstance(); await p.setString('bama_v3',jsonEncode({'songs':songs.map((x)=>x.toJson()).toList(),'lists':lists.map((x)=>x.toJson()).toList(),'styles':styles,'theme':theme})); notifyListeners(); }
+  Future<void> save() async { final p=await SharedPreferences.getInstance(); await p.setString('bama_v4',jsonEncode({'songs':songs.map((x)=>x.toJson()).toList(),'lists':lists.map((x)=>x.toJson()).toList(),'folders':folders.map((x)=>x.toJson()).toList(),'styles':styles,'theme':theme})); notifyListeners(); }
   Song? song(String id){for(final s in songs){if(s.id==id)return s;}return null;}
   Future<void> putSong(Song s) async { final i=songs.indexWhere((x)=>x.id==s.id); if(i<0)songs.add(s);else songs[i]=s; if(!styles.contains(s.style))styles.add(s.style); await save(); }
 Future<void> deleteSong(String id) async {songs.removeWhere((s)=>s.id==id);for(final l in lists){l.ids.remove(id);}await save();}
@@ -57,6 +64,15 @@ Future<void> deleteList(Setlist l) async {lists.removeWhere((x)=>x.id==l.id);awa
 Future<void> addStyle(String s) async {s=s.trim();if(s.isNotEmpty&&!styles.contains(s)){styles.add(s);await save();}}
 Future<void> deleteStyle(String s) async {if(styles.length<=1)return;styles.remove(s);for(final x in songs){if(x.style==s)x.style='כללי';}await save();}
 Future<void> setTheme(int t) async {theme=t;await save();}
+Future<void> addPlaylist(String n,{String folderId=''}) async {lists.add(Setlist(id:uid(),name:n,names:const[],folderId:folderId));await save();}
+Future<void> addFolder(String n,{String parentId=''}) async {folders.add(Folder(id:uid(),name:n,parentId:parentId));await save();}
+Future<void> deleteFolder(Folder f) async {for(final x in lists){if(x.folderId==f.id)x.folderId='';}for(final x in folders){if(x.parentId==f.id)x.parentId='';}folders.removeWhere((x)=>x.id==f.id);await save();}
+Future<void> movePlaylist(Setlist l,String folderId) async {l.folderId=folderId;await save();}
+Future<void> moveSong(Song s,String folderId) async {s.folderId=folderId;await save();}
+Future<void> renameFolder(Folder f,String n) async {f.name=n;await save();}
+Future<void> renamePlaylist(Setlist l,String n) async {l.name=n;await save();}
+Future<void> reorderPlaylistNames(Setlist l,int oldIndex,int newIndex) async {if(newIndex>oldIndex)newIndex--;final a=List<String>.from(l.names);final v=a.removeAt(oldIndex);a.insert(newIndex,v);l.names=a;await save();}
+Future<void> removePlaylistName(Setlist l,int i) async {final a=List<String>.from(l.names);a.removeAt(i);l.names=a;await save();}
   Future<void> addList(String n) async {lists.add(Setlist(id:uid(),name:n));await save();}
   Future<void> toggle(String lid,String sid) async {final l=lists.firstWhere((x)=>x.id==lid);if(l.ids.contains(sid))l.ids.remove(sid);else l.ids.add(sid);await save();}
 }
@@ -66,7 +82,7 @@ List<Song> demo()=>[
  Song(id:uid(),title:'קצב הלילה',style:'קצבי',key:'G',text:'# בית\nG D Em C\nהלילה מתחיל עכשיו\n\n# פזמון\n[G]בואו נרים את הקצב\n[D]ונשיר ביחד'),
 ];
 
-class LogoMark extends StatelessWidget{final double size;const LogoMark({super.key,this.size=52});@override Widget build(BuildContext c)=>Container(width:size,height:size,decoration:BoxDecoration(borderRadius:BorderRadius.circular(size*.3),gradient:const LinearGradient(colors:[accent2,accent])),child:Icon(Icons.graphic_eq_rounded,color:Colors.white,size:size*.55));}
+class LogoMark extends StatelessWidget{final double size;const LogoMark({super.key,this.size=52});@override Widget build(BuildContext c)=>Container(width:size,height:size,decoration:BoxDecoration(shape:BoxShape.circle,gradient:const LinearGradient(colors:[accent,accent2])),child:Stack(alignment:Alignment.center,children:[Icon(Icons.stadium_rounded,color:Colors.white,size:size*.72),Icon(Icons.music_note_rounded,color:Colors.white,size:size*.38)]));}
 class Home extends StatefulWidget {
   final Store store; const Home({super.key,required this.store});
   @override State<Home> createState()=>_HomeState();
