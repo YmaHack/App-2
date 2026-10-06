@@ -226,9 +226,10 @@ class Player extends StatefulWidget{
 }
 class _PlayerState extends State<Player> with SingleTickerProviderStateMixin{
   late ScrollController scroll; late Ticker ticker; late List<Section> sections;
-  bool playing=false,userScroll=false,animating=false; Duration? last; double speed=25,font=24;
-  @override void initState(){super.initState();scroll=ScrollController();ticker=createTicker(tick);sections=parseSections(widget.song.text);speed=widget.store.speed;font=widget.store.font;}
-  @override void dispose(){ticker.dispose();scroll.dispose();super.dispose();}
+  bool playing=false,userScroll=false,animating=false; int active=0; Duration? last; double speed=25,font=24;
+  @override void initState(){super.initState();scroll=ScrollController();ticker=createTicker(tick);sections=parseSections(widget.song.text);speed=widget.store.speed;font=widget.store.font;scroll.addListener(updateActive);}
+  @override void dispose(){scroll.removeListener(updateActive);ticker.dispose();scroll.dispose();super.dispose();}
+  void updateActive(){if(!scroll.hasClients)return;int next=0;for(int i=0;i<sections.length;i++){final ctx=sections[i].key.currentContext;if(ctx!=null){final b=ctx.findRenderObject();if(b is RenderBox&&b.localToGlobal(Offset.zero).dy<=190)next=i;}}if(next!=active&&mounted)setState(()=>active=next);}
   void tick(Duration now){
     if(!playing||userScroll||animating||!scroll.hasClients){last=now;return;}
     final prev=last??now;final dt=(now-prev).inMicroseconds/1000000;last=now;
@@ -253,9 +254,9 @@ class _PlayerState extends State<Player> with SingleTickerProviderStateMixin{
       IconButton(tooltip:'מצב במה',onPressed:()=>widget.store.settings(m:!stage),icon:Icon(stage?Icons.light_mode_outlined:Icons.dark_mode_outlined)),
     ]),
     body:Column(children:[
-      SongMap(sections:sections,onTap:jump),
-      if(sections.isNotEmpty)Padding(padding:const EdgeInsets.symmetric(horizontal:16,vertical:3),child:Align(alignment:Alignment.centerRight,child:Text(sections.first.name,style:TextStyle(color:sectionColor(sections.first.type),fontWeight:FontWeight.bold)))),
-      Expanded(child:NotificationListener<ScrollNotification>(onNotification:(n){if(n is UserScrollNotification)userScroll=n.direction!=ScrollDirection.idle;if(n is ScrollEndNotification)userScroll=false;return false;},child:ListView.builder(controller:scroll,padding:const EdgeInsets.fromLTRB(12,8,12,190),itemCount:sections.length,itemBuilder:(_,i)=>SectionView(section:sections[i],font:font,stage:stage)))),
+      SongMap(sections:sections,active:active,onTap:jump),
+      if(sections.isNotEmpty)Padding(padding:const EdgeInsets.symmetric(horizontal:16,vertical:3),child:Align(alignment:Alignment.centerRight,child:Text(sections[active].name,style:TextStyle(color:sectionColor(sections[active].type),fontWeight:FontWeight.bold)))),
+      Expanded(child:NotificationListener<ScrollNotification>(onNotification:(n){if(n is UserScrollNotification)userScroll=n.direction!=ScrollDirection.idle;if(n is ScrollEndNotification)userScroll=false;return false;},child:ListView.builder(controller:scroll,padding:const EdgeInsets.fromLTRB(12,8,12,190),itemCount:sections.length,itemBuilder:(_,i)=>SectionView(section:sections[i],font:font,stage:stage,semi:widget.song.semi)))),
       Dock(playing:playing,speed:speed,keyName:transposeKey(widget.song.key,widget.song.semi),onPlay:play,onSpeed:(v){setState(()=>speed=v);widget.store.settings(s:v);},onTranspose:transpose,onNext:next)
     ]));
   }
@@ -272,10 +273,10 @@ class Dock extends StatelessWidget{
 }
 
 class SongMap extends StatelessWidget{
-  final List<Section> sections; final ValueChanged<int> onTap;
-  const SongMap({super.key,required this.sections,required this.onTap});
+  final List<Section> sections; final int active; final ValueChanged<int> onTap;
+  const SongMap({super.key,required this.sections,required this.active,required this.onTap});
   @override Widget build(BuildContext c)=>SizedBox(height:42,child:Padding(padding:const EdgeInsets.symmetric(horizontal:10),child:Row(children:List.generate(sections.length,(i){
-    final s=sections[i];return Expanded(flex:math.max(1,s.lines.length),child:Padding(padding:const EdgeInsets.symmetric(horizontal:1),child:InkWell(onTap:()=>onTap(i),child:Container(decoration:BoxDecoration(color:sectionColor(s.type).withValues(alpha:.75),borderRadius:BorderRadius.circular(7)),alignment:Alignment.center,child:Text(s.name,maxLines:1,overflow:TextOverflow.ellipsis,style:const TextStyle(fontSize:11,fontWeight:FontWeight.bold))))));
+    final s=sections[i];return Expanded(flex:math.max(1,s.lines.length),child:Padding(padding:const EdgeInsets.symmetric(horizontal:1),child:InkWell(onTap:()=>onTap(i),child:Container(decoration:BoxDecoration(color:sectionColor(s.type).withValues(alpha:i==active?.95:.24),borderRadius:BorderRadius.circular(7),border:i==active?Border.all(color:Colors.white,width:1.2):null),alignment:Alignment.center,child:Text(s.name,maxLines:1,overflow:TextOverflow.ellipsis,style:const TextStyle(fontSize:11,fontWeight:FontWeight.bold))))));
   }))));
 }
 
@@ -295,26 +296,26 @@ String sectionType(String n){final x=n.toLowerCase();if(x.contains('פזמון')
 Color sectionColor(String t)=>t=='chorus'?chorusColor:t=='bridge'?bridgeColor:t=='verse'?verseColor:otherColor;
 
 class SectionView extends StatelessWidget{
-  final Section section;final double font;final bool stage;
-  const SectionView({super.key,required this.section,required this.font,required this.stage});
+  final Section section;final double font;final bool stage;final int semi;
+  const SectionView({super.key,required this.section,required this.font,required this.stage,required this.semi});
   @override Widget build(BuildContext c)=>Container(key:section.key,margin:const EdgeInsets.only(bottom:22),decoration:BoxDecoration(color:stage?Colors.black:const Color(0xFF15151B),borderRadius:BorderRadius.circular(14)),child:IntrinsicHeight(child:Row(crossAxisAlignment:CrossAxisAlignment.stretch,children:[
     Container(width:7,decoration:BoxDecoration(color:sectionColor(section.type),borderRadius:BorderRadius.circular(7))),
     Expanded(child:Padding(padding:const EdgeInsets.fromLTRB(12,9,10,12),child:Column(crossAxisAlignment:CrossAxisAlignment.stretch,children:[
       Text(section.name,style:TextStyle(color:sectionColor(section.type),fontWeight:FontWeight.w900)),
       const SizedBox(height:7),
-      ...section.lines.map((l)=>Padding(padding:const EdgeInsets.only(bottom:10),child:ChordLine(l,font)))
+      ...section.lines.map((l)=>Padding(padding:const EdgeInsets.only(bottom:10),child:ChordLine(l,font,semi)))
     ])))
   ])));
 }
 
 class ChordLine extends StatelessWidget{
-  final String line;final double font;
-  const ChordLine(this.line,this.font,{super.key});
+  final String line;final double font;final int semi;
+  const ChordLine(this.line,this.font,this.semi,{super.key});
   @override Widget build(BuildContext c){
     final tokens=parseTokens(line);
     if(tokens.length==1&&tokens.first.$1==null)return Text(line,style:TextStyle(fontSize:font,height:1.3));
     return Wrap(spacing:2,runSpacing:7,crossAxisAlignment:WrapCrossAlignment.end,children:tokens.map((t)=>Column(mainAxisSize:MainAxisSize.min,crossAxisAlignment:CrossAxisAlignment.start,children:[
-      SizedBox(height:font*.85,child:t.$1==null?null:Directionality(textDirection:TextDirection.ltr,child:Text(t.$1!,style:TextStyle(fontFamily:'monospace',color:chordColor,fontWeight:FontWeight.w800,fontSize:math.max(13,font*.62))))),
+      SizedBox(height:font*.85,child:t.$1==null?null:Directionality(textDirection:TextDirection.ltr,child:Text(transposeChord(t.$1!,semi),style:TextStyle(fontFamily:'monospace',color:chordColor,fontWeight:FontWeight.w800,fontSize:math.max(13,font*.62))))),
       Text(t.$2.isEmpty?' ':t.$2,style:TextStyle(fontSize:font,height:1.15))
     ])).toList());
   }
@@ -332,7 +333,77 @@ List<(String?,String)> parseTokens(String line){
 }
 
 class Converter{
-  static final chord=RegExp(r'^[A-G][#b]?(?:m|maj|dim|sus|add)?\\d*(?:/[A-G][#b]?)?\$');
+  static final chord=RegExp(r'^[A-G][#b]?(?:m|maj|dim|sus|add)?\d*(?:/[A-G][#b]?)?);
+  static final heading=RegExp(r'^(בית|פזמון|מעבר|גשר|פתיחה|סיום|intro|verse|chorus|bridge|outro)\\b',caseSensitive:false);
+  static String convert(String input){
+    final a=input.replaceAll('\\r','').split('\\n'),out=<String>[];
+    for(int i=0;i<a.length;i++){
+      final line=a[i],t=line.trim();
+      if(t.isEmpty){out.add('');continue;}
+      if(line.contains('#')||RegExp(r'\\[[^\\]]+\\]').hasMatch(line)){out.add(line);continue;}
+      if(t.length<=21&&heading.hasMatch(t)){out.add('# '+t);continue;}
+      final ms=RegExp(r'\\S+').allMatches(line).toList();
+      if(ms.isNotEmpty&&ms.every((m)=>chord.hasMatch(m.group(0)!))){
+        if(i+1<a.length&&a[i+1].trim().isNotEmpty){
+          var next=a[i+1];
+          for(final m in ms.reversed){final at=math.min(m.start,next.length);next=next.substring(0,at)+'['+m.group(0)!+']'+next.substring(at);}
+          out.add(next);i++;
+        }else{out.add(ms.map((m)=>'['+m.group(0)!+']').join(' '));}
+      }else out.add(line);
+    }
+    return out.join('\\n');
+  }
+}
+
+const chrom=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+int noteIndex(String n){
+  n=n.replaceAll('Db','C#').replaceAll('Eb','D#').replaceAll('Gb','F#').replaceAll('Ab','G#').replaceAll('Bb','A#');
+  return chrom.indexOf(n);
+}
+String moveNote(String n,int d){final i=noteIndex(n);if(i<0)return n;return chrom[(i+d)%12<0?(i+d)%12+12:(i+d)%12];}
+String transposeChord(String chord,int d){
+  final m=RegExp(r'^([A-G](?:#|b)?)(.*?)(?:/([A-G](?:#|b)?))?).firstMatch(chord.trim());if(m==null)return chord;
+  final root=moveNote(m.group(1)!,d),suffix=m.group(2)??'',bass=m.group(3);return bass==null?root+suffix:root+suffix+'/'+moveNote(bass,d);
+}
+String transposeKey(String key,int d)=>transposeChord(key,d);
+);
+  static final heading=RegExp(r'^(בית|פזמון|מעבר|גשר|פתיחה|סיום|intro|verse|chorus|bridge|outro)\\b',caseSensitive:false);
+  static String convert(String input){
+    final a=input.replaceAll('\\r','').split('\\n'),out=<String>[];
+    for(int i=0;i<a.length;i++){
+      final line=a[i],t=line.trim();
+      if(t.isEmpty){out.add('');continue;}
+      if(line.contains('#')||RegExp(r'\\[[^\\]]+\\]').hasMatch(line)){out.add(line);continue;}
+      if(t.length<=21&&heading.hasMatch(t)){out.add('# '+t);continue;}
+      final ms=RegExp(r'\\S+').allMatches(line).toList();
+      if(ms.isNotEmpty&&ms.every((m)=>chord.hasMatch(m.group(0)!))){
+        if(i+1<a.length&&a[i+1].trim().isNotEmpty){
+          var next=a[i+1];
+          for(final m in ms.reversed){final at=math.min(m.start,next.length);next=next.substring(0,at)+'['+m.group(0)!+']'+next.substring(at);}
+          out.add(next);i++;
+        }else{out.add(ms.map((m)=>'['+m.group(0)!+']').join(' '));}
+      }else out.add(line);
+    }
+    return out.join('\\n');
+  }
+}
+
+const chrom=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+int noteIndex(String n){
+  n=n.replaceAll('Db','C#').replaceAll('Eb','D#').replaceAll('Gb','F#').replaceAll('Ab','G#').replaceAll('Bb','A#');
+  return chrom.indexOf(n);
+}
+String moveNote(String n,int d){final i=noteIndex(n);if(i<0)return n;return chrom[(i+d)%12<0?(i+d)%12+12:(i+d)%12];}
+String transposeChord(String chord,int d){
+  final m=RegExp(r'^([A-G](?:#|b)?)(.*?)(?:/([A-G](?:#|b)?))?\$').firstMatch(chord.trim());if(m==null)return chord;
+  final root=moveNote(m.group(1)!,d),suffix=m.group(2)??'',bass=m.group(3);return bass==null?root+suffix:root+suffix+'/'+moveNote(bass,d);
+}
+String transposeKey(String key,int d)=>transposeChord(key,d);
+).firstMatch(chord.trim());if(m==null)return chord;
+  final root=moveNote(m.group(1)!,d),suffix=m.group(2)??'',bass=m.group(3);return bass==null?root+suffix:root+suffix+'/'+moveNote(bass,d);
+}
+String transposeKey(String key,int d)=>transposeChord(key,d);
+);
   static final heading=RegExp(r'^(בית|פזמון|מעבר|גשר|פתיחה|סיום|intro|verse|chorus|bridge|outro)\\b',caseSensitive:false);
   static String convert(String input){
     final a=input.replaceAll('\\r','').split('\\n'),out=<String>[];
