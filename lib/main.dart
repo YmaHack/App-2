@@ -103,10 +103,6 @@ class Lists extends StatelessWidget{
       const Text('רשימות ההופעה שלך',style:TextStyle(fontSize:25,fontWeight:FontWeight.w800)),
       const SizedBox(height:5),const Text('חלק כל רשימה לפי סגנון ועבור ביניהם במהירות.',style:TextStyle(color:soft)),const SizedBox(height:18),
       ...store.lists.map((l)=>ListCard(store:store,list:l)),
-        Container(width:54,height:54,decoration:BoxDecoration(color:accent.withOpacity(.15),borderRadius:BorderRadius.circular(17)),child:const Icon(Icons.mic_external_on,color:accent)),
-        const SizedBox(width:14),Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text(l.name,style:const TextStyle(fontSize:18,fontWeight:FontWeight.bold)),const SizedBox(height:5),Text(l.ids.length.toString()+' שירים',style:const TextStyle(color:soft))])),
-        const Icon(Icons.chevron_left,color:soft)
-      ])))))),
     ]),
   );
 }
