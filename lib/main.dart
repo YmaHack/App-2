@@ -10,7 +10,7 @@ import 'package:syncfusion_flutter_pdf/pdf.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_tesseract_ocr/flutter_tesseract_ocr.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:pdf_renderer/pdf_renderer.dart' as pdf_renderer;
+import 'package:pdf_image_renderer/pdf_image_renderer.dart';
 
 const bg=Color(0xFF0B1020), card=Color(0xFF151D33), accent=Color(0xFF5DE4C7), accent2=Color(0xFF7C83FD), soft=Color(0xFF9BA8C4), chord=Color(0xFFFFD166);
 ThemeData appTheme(int t){
@@ -94,7 +94,7 @@ class LogoMark extends StatelessWidget{
   const LogoMark({super.key,this.size=52});
   @override Widget build(BuildContext c)=>SizedBox(width:size,height:size,child:SvgPicture.asset('assets/logo.svg',semanticsLabel:'במה',fit:BoxFit.contain));
 }
-class Home extends StatefulWidget {class Home extends StatefulWidget {
+class Home extends StatefulWidget {
   final Store store; const Home({super.key,required this.store});
   @override State<Home> createState()=>_HomeState();
 }
