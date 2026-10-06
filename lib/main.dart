@@ -446,58 +446,14 @@ String extractPdfSmart(List<int> bytes){
 bool containsHebrew(String s)=>RegExp(r'[\u0590-\u05FF]').hasMatch(s);
 bool looksLikeChordLine(String s){final t=s.replaceAll(RegExp(r'[|,;]'),' ').split(RegExp(r'\s+')).where((x)=>x.isNotEmpty).toList();if(t.isEmpty||t.length>18)return false;return t.where((x)=>isChord(x.replaceAll(RegExp(r'x\d+$'),'')).length/t.length>=.65;}
 String attachChords(List<TextWord> chords,List<TextWord> lyrics,bool heb){final w=[...lyrics]..sort((x,y)=>heb?y.bounds.left.compareTo(x.bounds.left):x.bounds.left.compareTo(y.bounds.left));final at=<int,List<String>>{};for(final ch in chords){final x=ch.bounds.center.dx;int best=0;double dist=double.infinity;for(int i=0;i<w.length;i++){final z=w[i],d=x<z.bounds.left?z.bounds.left-x:x>z.bounds.right?x-z.bounds.right:0;if(d<dist){dist=d;best=i;}}at.putIfAbsent(best,()=>[]).add(ch.text);}final out=StringBuffer();for(int i=0;i<w.length;i++){if(i>0)out.write(' ');for(final c in at[i]??const <String>[]){out.write('[');out.write(c);out.write(']');}out.write(w[i].text);}return out.toString();}
-class OcrWord{final String text;final double left,top,right,bottom;const OcrWord(this.text,this.left,this.top,this.right,this.bottom);}
-String decodeOcrHtml(String s)=>s.replaceAll('&amp;','&').replaceAll('&lt;','<').replaceAll('&gt;','>').replaceAll('&#39;',"'").replaceAll('&quot;','"');
-List<List<OcrWord>> parseHocrLines(String hocr){
-  final rx=RegExp(r'<span[^>]*class=["\']ocrx_word["\'][^>]*title=["\'][^"\']*?bbox\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)[^"\']*["\'][^>]*>(.*?)</span>',caseSensitive:false,dotAll:true);
-  final words=<OcrWord>[];
-  for(final m in rx.allMatches(hocr)){final t=decodeOcrHtml(m.group(5)!.replaceAll(RegExp(r'<[^>]+>'),'')).trim();if(t.isNotEmpty)words.add(OcrWord(t,double.parse(m.group(1)!),double.parse(m.group(2)!),double.parse(m.group(3)!),double.parse(m.group(4)!)));}
-  words.sort((a,b)=>a.top.compareTo(b.top));
-  final lines=<List<OcrWord>>[];
-  for(final w in words){if(lines.isEmpty||(w.top-lines.last.first.top).abs()>math.max(14.0,w.bottom-w.top))lines.add([w]);else lines.last.add(w);}
-  for(final line in lines){final heb=line.any((w)=>containsHebrew(w.text));line.sort((a,b)=>heb?b.left.compareTo(a.left):a.left.compareTo(b.left));}
-  return lines;
-}
-String hocrToChordPro(String hocr){
-  final lines=parseHocrLines(hocr),out=<String>[];
-  for(int i=0;i<lines.length;i++){
-    final line=lines[i];if(line.isEmpty)continue;
-    final raw=line.map((w)=>w.text).join(' ').trim(),h=heading(raw.replaceAll(':','').trim());
-    if(h!=null&&raw.length<30){out.add('# '+h);continue;}
-    final chords=line.where((w)=>isChord(w.text)||RegExp(r'^.+x\d+$').hasMatch(w.text)&&isChord(w.text.replaceAll(RegExp(r'x\d+$'),'')).toList();
-    final lyrics=line.where((w)=>!chords.contains(w)).toList();
-    if(chords.isNotEmpty&&lyrics.isEmpty&&i+1<lines.length){
-      final next=lines[i+1],nextChords=next.where((w)=>isChord(w.text)).toList(),nextLyrics=next.where((w)=>!isChord(w.text)).toList();
-      if(nextLyrics.isNotEmpty&&nextChords.isEmpty){out.add(attachOcrChords(chords,nextLyrics));i++;continue;}
-    }
-    if(chords.isNotEmpty&&lyrics.isNotEmpty)out.add(attachOcrChords(chords,lyrics));else out.add(line.map((w)=>w.text).join(' '));
-  }
-  return normalize(out.join('\n'));
-}
-String attachOcrChords(List<OcrWord> chords,List<OcrWord> lyrics){final at=<int,List<String>>{};for(final ch in chords){final x=(ch.left+ch.right)/2;int best=0;double dist=double.infinity;for(int i=0;i<lyrics.length;i++){final z=lyrics[i],d=x<z.left?z.left-x:x>z.right?x-z.right:0;if(d<dist){dist=d;best=i;}}at.putIfAbsent(best,()=>[]).add(ch.text);}final b=StringBuffer();for(int i=0;i<lyrics.length;i++){if(i>0)b.write(' ');for(final c in at[i]??const <String>[]){b.write('[');b.write(c);b.write(']');}b.write(lyrics[i].text);}return b.toString();}
-Future<void> ensureTessData()async{
-  final dir=Directory(await FlutterTesseractOcr.getTessdataPath());if(!await dir.exists())await dir.create(recursive:true);
-  for(final lang in ['heb','eng']){
-    final f=File(dir.path+'/'+lang+'.traineddata');if(await f.exists()&&await f.length()>10000)continue;
-    final client=HttpClient();try{final req=await client.getUrl(Uri.parse('https://github.com/tesseract-ocr/tessdata_fast/raw/main/'+lang+'.traineddata'));final res=await req.close();if(res.statusCode!=200)throw Exception('לא ניתן להוריד מודל OCR '+lang);final data=await consolidateHttpClientResponseBytes(res);await f.writeAsBytes(data);}finally{client.close();}
-  }
-}
-Future<String> ocrImageBytes(List<int> bytes,{String extension='png'})async{
-  await ensureTessData();final dir=await getTemporaryDirectory();final file=File(dir.path+'/bama_ocr_'+DateTime.now().microsecondsSinceEpoch+'.'+extension);await file.writeAsBytes(bytes,flush:true);
-  try{return hocrToChordPro(await FlutterTesseractOcr.extractHocr(file.path,language:'heb+eng',args:{'psm':'6','preserve_interword_spaces':'1'}));}finally{if(await file.exists())await file.delete();}
-}
-Future<String> ocrPdfBytes(List<int> bytes)async{
-  final dir=await getTemporaryDirectory(),pdfFile=File(dir.path+'/bama_pdf_'+DateTime.now().microsecondsSinceEpoch+'.pdf');await pdfFile.writeAsBytes(bytes,flush:true);
-  final doc=await pdf_renderer.PdfDocument.openFile(pdfFile.path),out=<String>[];
-  try{for(int pageNo=1;pageNo<=doc.pageCount;pageNo++){final page=await doc.getPage(pageNo);try{final image=await page.render(width:(page.width*2).round(),height:(page.height*2).round(),format:pdf_renderer.PdfPageImageFormat.PNG);if(image.bytes.isNotEmpty)out.add(await ocrImageBytes(image.bytes));}finally{await page.close();}}}finally{doc.dispose();if(await pdfFile.exists())await pdfFile.delete();}
-  return normalize(out.join('\n\n'));
-}
 Future<String> smartExtractFile(String? path,List<int> bytes,String extension)async{
-  final ext=extension.toLowerCase();
-  if(ext=='txt')return normalize(utf8.decode(bytes,allowMalformed:true));
-  if(ext=='pdf'){final text=extractPdfSmart(bytes);final useful=text.trim().length>30&&(containsHebrew(text)||RegExp(r'[A-G](?:#|b)?(?:m|7|maj7)?').hasMatch(text));return useful?text:await ocrPdfBytes(bytes);}
-  if(['jpg','jpeg','png','webp','bmp'].contains(ext))return await ocrImageBytes(bytes,extension:ext=='jpg'||ext=='jpeg'?'jpg':'png');
-  throw Exception('פורמט קובץ לא נתמך');
+ final e=extension.toLowerCase();
+ if(e=='txt')return normalize(utf8.decode(bytes,allowMalformed:true));
+ if(e=='pdf'){final d=PdfDocument(inputBytes:bytes);try{return normalize(PdfTextExtractor(d).extractText());}finally{d.dispose();}}
+ final dir=await getTemporaryDirectory();
+ final f=File(dir.path+'/bama_ocr_'+DateTime.now().microsecondsSinceEpoch.toString()+'.'+e);
+ await f.writeAsBytes(bytes,flush:true);
+ try{return normalize(await FlutterTesseractOcr.extractText(f.path,language:'heb+eng',args:{'psm':'6'}));}finally{if(await f.exists())await f.delete();}
 }
 List<String> parseSongList(String raw){final out=<String>[];for(final line in raw.replaceAll('\r','').split('\n')){var x=line.trim();if(x.isEmpty)continue;x=x.replaceFirst(RegExp(r'^\s*(?:\d+[.)\-:]|[-•])\s*'),'');if(isChord(x)||looksLikeChordLine(x)||x.length>90)continue;if(RegExp(r'^(רשימת שירים|שירים|playlist|setlist)$',caseSensitive:false).hasMatch(x))continue;if(!out.contains(x))out.add(x);}return out;}
 String baseName(String path)=>path.split(Platform.pathSeparator).last.replaceFirst(RegExp(r'\.(txt|pdf|jpg|jpeg|png|webp|bmp)$',caseSensitive:false),'');
