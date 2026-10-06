@@ -578,7 +578,7 @@ Future<String> _ocrImageBytes(List<int> bytes,String extension)async{
   try{return await _ocrImageFile(file);}finally{if(await file.exists())await file.delete();}
 }
 Future<String> _ocrPdf(List<int> bytes)async{
-  final document=await pdfx.PdfDocument.openData(bytes);
+  final document=await pdfx.PdfDocument.openData(Uint8List.fromList(bytes));
   final out=<String>[];
   try{
     for(int pageNo=1;pageNo<=document.pagesCount;pageNo++){
@@ -587,6 +587,7 @@ Future<String> _ocrPdf(List<int> bytes)async{
         final image=await page.render(width:page.width*2,height:page.height*2,format:pdfx.PdfPageImageFormat.png);
         final dir=await getTemporaryDirectory();
         final file=File('\${dir.path}/bama_pdf_\${DateTime.now().microsecondsSinceEpoch}_$pageNo.png');
+        if(image==null||image.bytes==null)continue;
         await file.writeAsBytes(image.bytes!,flush:true);
         try{out.add(await _ocrImageFile(file));}finally{if(await file.exists())await file.delete();}
       }finally{await page.close();}
