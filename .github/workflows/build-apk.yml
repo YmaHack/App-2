@@ -20,6 +20,8 @@ jobs:
         run: rm -rf test
       - name: Get packages
         run: flutter pub get
+      - name: Generate launcher icon
+        run: dart run launcher_icons
       - name: Analyze
         run: flutter analyze --no-fatal-infos
       - name: Build release APK
