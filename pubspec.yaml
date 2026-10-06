@@ -27,8 +27,6 @@ flutter:
   uses-material-design: true
   assets:
     - assets/logo.svg
-    - assets/tessdata_config.json
-    - assets/tessdata/
 
 flutter_launcher_icons:
   android: "launcher_icon"
