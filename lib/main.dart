@@ -10,7 +10,7 @@ import 'package:syncfusion_flutter_pdf/pdf.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_tesseract_ocr/flutter_tesseract_ocr.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:pdf_renderer/pdf_renderer.dart' as pdf_renderer;
+import 'package:pdf_image_renderer/pdf_image_renderer.dart';
 
 const bg=Color(0xFF0B1020), card=Color(0xFF151D33), accent=Color(0xFF5DE4C7), accent2=Color(0xFF7C83FD), soft=Color(0xFF9BA8C4), chord=Color(0xFFFFD166);
 ThemeData appTheme(int t){
@@ -487,10 +487,27 @@ Future<String> ocrImageBytes(List<int> bytes,{String extension='png'})async{
   try{return hocrToChordPro(await FlutterTesseractOcr.extractHocr(file.path,language:'heb+eng',args:{'psm':'6','preserve_interword_spaces':'1'}));}finally{if(await file.exists())await file.delete();}
 }
 Future<String> ocrPdfBytes(List<int> bytes)async{
-  final dir=await getTemporaryDirectory(),pdfFile=File(dir.path+'/bama_pdf_'+DateTime.now().microsecondsSinceEpoch+'.pdf');await pdfFile.writeAsBytes(bytes,flush:true);
-  final doc=await pdf_renderer.PdfDocument.openFile(pdfFile.path),out=<String>[];
-  try{for(int pageNo=1;pageNo<=doc.pageCount;pageNo++){final page=await doc.getPage(pageNo);try{final image=await page.render(width:(page.width*2).round(),height:(page.height*2).round(),format:pdf_renderer.PdfPageImageFormat.PNG);if(image.bytes.isNotEmpty)out.add(await ocrImageBytes(image.bytes));}finally{await page.close();}}}finally{doc.dispose();if(await pdfFile.exists())await pdfFile.delete();}
-  return normalize(out.join('\n\n'));
+  final dir=await getTemporaryDirectory();
+  final pdfFile=File(dir.path+'/bama_pdf_'+DateTime.now().microsecondsSinceEpoch.toString()+'.pdf');
+  await pdfFile.writeAsBytes(bytes,flush:true);
+  final pdf=PdfImageRenderer(path:pdfFile.path);
+  final out=<String>[];
+  try{
+    await pdf.open();
+    final count=await pdf.getPageCount();
+    for(int pageIndex=0;pageIndex<count;pageIndex++){
+      await pdf.openPage(pageIndex:pageIndex);
+      try{
+        final size=await pdf.getPageSize(pageIndex:pageIndex);
+        final image=await pdf.renderPage(pageIndex:pageIndex,x:0,y:0,width:size.width,height:size.height,scale:2,background:Colors.white);
+        if(image.isNotEmpty)out.add(await ocrImageBytes(image));
+      }finally{await pdf.closePage(pageIndex:pageIndex);}
+    }
+  }finally{
+    pdf.close();
+    if(await pdfFile.exists())await pdfFile.delete();
+  }
+  return normalize(out.join('\\n\\n'));
 }
 Future<String> smartExtractFile(String? path,List<int> bytes,String extension)async{
   final ext=extension.toLowerCase();
