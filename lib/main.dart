@@ -423,50 +423,150 @@ class _EditorState extends State<Editor>{
 String extractPdfSmart(List<int> bytes){
   final d=PdfDocument(inputBytes:bytes);
   try{
-    final lines=PdfTextExtractor(d).extractTextLines();if(lines.isEmpty)return '';
-    final pages=<int,List<TextLine>>{};for(final l in lines){pages.putIfAbsent(l.pageIndex,()=>[]).add(l);}
+    final lines=PdfTextExtractor(d).extractTextLines();
+    if(lines.isEmpty)return '';
+    final pages=<int,List<TextLine>>{};
+    for(final line in lines){pages.putIfAbsent(line.pageIndex,()=>[]).add(line);}
     final out=<String>[];
-    for(final page in pages.keys.toList()..sort()){
-      final ls=pages[page]!..sort((x,y)=>x.bounds.top.compareTo(y.bounds.top));
+    for(final pageIndex in pages.keys.toList()..sort()){
+      final ls=pages[pageIndex]!..sort((a,b){final dy=a.bounds.top.compareTo(b.bounds.top);return dy!=0?dy:a.bounds.left.compareTo(b.bounds.left);});
       for(int i=0;i<ls.length;i++){
-        final line=ls[i],words=[...line.wordCollection],heb=containsHebrew(line.text);
-        words.sort((x,y)=>heb?y.bounds.left.compareTo(x.bounds.left):x.bounds.left.compareTo(y.bounds.left));
-        final text=words.map((w)=>w.text).join(' ').trim();if(text.isEmpty)continue;
-        if(looksLikeChordLine(text)&&i+1<ls.length){
-          final below=ls[i+1],bw=[...below.wordCollection],bheb=containsHebrew(below.text);
-          bw.sort((x,y)=>bheb?y.bounds.left.compareTo(x.bounds.left):x.bounds.left.compareTo(y.bounds.left));
-          if(bw.isNotEmpty&&!looksLikeChordLine(below.text)&&below.bounds.top-line.bounds.bottom<line.fontSize*3){out.add(attachChords(words,bw,bheb));i++;continue;}
+        final line=ls[i];
+        final words=[...line.wordCollection];
+        final heb=containsHebrew(line.text);
+        words.sort((a,b)=>heb?b.bounds.left.compareTo(a.bounds.left):a.bounds.left.compareTo(b.bounds.left));
+        final visible=words.map((w)=>w.text).join(' ').trim();
+        if(visible.isEmpty)continue;
+        final h=heading(visible);
+        if(h!=null&&visible.length<28){out.add('# '+h);continue;}
+        if(looksLikeChordLine(visible)&&i+1<ls.length){
+          final below=ls[i+1];
+          final bw=[...below.wordCollection];
+          final bheb=containsHebrew(below.text);
+          bw.sort((a,b)=>bheb?b.bounds.left.compareTo(a.bounds.left):a.bounds.left.compareTo(b.bounds.left));
+          final gap=below.bounds.top-line.bounds.bottom;
+          if(bw.isNotEmpty&&!looksLikeChordLine(below.text)&&gap<line.fontSize*3.2){out.add(attachChords(words,bw,bheb));i++;continue;}
         }
-        out.add(text);
+        out.add(visible);
       }
       out.add('');
     }
-    return normalize(out.join('\n'));
+    return smartStructure(normalize(out.join('\n')));
   }finally{d.dispose();}
 }
 bool containsHebrew(String s)=>RegExp(r'[\u0590-\u05FF]').hasMatch(s);
 bool looksLikeChordLine(String s){
- final t=s.replaceAll(RegExp(r'[|,;]'),' ').split(RegExp(r'\\s+')).where((x)=>x.isNotEmpty).toList();
- if(t.isEmpty||t.length>18)return false;
- final n=t.where((x)=>isChord(x.replaceAll(RegExp(r'x\\d+$'),''))).length;
- return n/t.length>=.65;
+  final t=s.replaceAll(RegExp(r'[|,;]'),' ').split(RegExp(r'\s+')).where((x)=>x.isNotEmpty).toList();
+  if(t.isEmpty||t.length>24)return false;
+  final n=t.where((x)=>isChord(x.replaceAll(RegExp(r'x\d+$'),''))).length;
+  return n/t.length>=.60;
 }
 String attachChords(List<TextWord> chords,List<TextWord> lyrics,bool heb){
- final w=[...lyrics]..sort((a,b)=>heb?b.bounds.left.compareTo(a.bounds.left):a.bounds.left.compareTo(b.bounds.left));
- final at=<int,List<String>>{};
- for(final ch in chords){final x=ch.bounds.center.dx;int best=0;double dist=double.infinity;for(int k=0;k<w.length;k++){final z=w[k];final d=x<z.bounds.left?z.bounds.left-x:x>z.bounds.right?x-z.bounds.right:0.0;if(d<dist){dist=d;best=k;}}at.putIfAbsent(best,()=>[]).add(ch.text);}
- final out=StringBuffer();for(int k=0;k<w.length;k++){if(k>0)out.write(' ');for(final c in at[k]??const <String>[]){out.write('[');out.write(c);out.write(']');}out.write(w[k].text);}return out.toString();
+  final w=[...lyrics]..sort((a,b)=>heb?b.bounds.left.compareTo(a.bounds.left):a.bounds.left.compareTo(b.bounds.left));
+  final at=<int,List<String>>{};
+  for(final ch in chords){
+    final x=ch.bounds.center.dx;
+    var best=0;var dist=double.infinity;
+    for(int k=0;k<w.length;k++){
+      final z=w[k];
+      final d=x<z.bounds.left?z.bounds.left-x:x>z.bounds.right?x-z.bounds.right:0.0;
+      if(d<dist){dist=d;best=k;}
+    }
+    at.putIfAbsent(best,()=>[]).add(ch.text);
+  }
+  final out=StringBuffer();
+  for(int k=0;k<w.length;k++){
+    if(k>0)out.write(' ');
+    for(final c in at[k]??const <String>[]){out.write('[');out.write(c);out.write(']');}
+    out.write(w[k].text);
+  }
+  return out.toString();
+}
+String attachChordsByColumns(String chordLine,String lyricLine){
+  final cr=RegExp(r'\S+');
+  final chords=<({String text,int pos})>[];
+  for(final m in cr.allMatches(chordLine)){final t=m.group(0)!;if(isChord(t))chords.add((text:t,pos:m.start));}
+  final words=<({String text,int start,int end})>[];
+  for(final m in cr.allMatches(lyricLine)){words.add((text:m.group(0)!,start:m.start,end:m.end));}
+  if(chords.isEmpty||words.isEmpty)return lyricLine;
+  final at=<int,List<String>>{};
+  for(final ch in chords){
+    var best=0;var dist=1e9;
+    for(int k=0;k<words.length;k++){final w=words[k];final d=(ch.pos-((w.start+w.end)/2)).abs();if(d<dist){dist=d;best=k;}}
+    at.putIfAbsent(best,()=>[]).add(ch.text);
+  }
+  final out=StringBuffer();
+  for(int k=0;k<words.length;k++){if(k>0)out.write(' ');for(final c in at[k]??const <String>[]){out.write('[');out.write(c);out.write(']');}out.write(words[k].text);}
+  return out.toString();
+}
+String smartStructure(String input){
+  final raw=input.replaceAll('\r','').split('\n');
+  final out=<String>[];
+  var lyricSeen=false;
+  for(int i=0;i<raw.length;i++){
+    final line=raw[i].trimRight();
+    if(line.trim().isEmpty){out.add('');continue;}
+    final h=heading(line.trim());
+    if(h!=null){out.add('# '+h);lyricSeen=true;continue;}
+    if(!lyricSeen&&looksLikeChordLine(line)){
+      out.add('# פתיחה');
+      out.add(line);
+      if(i+1<raw.length&&raw[i+1].trim().isNotEmpty&&!looksLikeChordLine(raw[i+1])){out.add(raw[i+1]);i++;}
+      lyricSeen=true;
+      continue;
+    }
+    out.add(line);
+    if(containsHebrew(line)&&!looksLikeChordLine(line))lyricSeen=true;
+  }
+  final lines=out.toList();
+  for(int i=0;i<lines.length-1;i++){
+    if(looksLikeChordLine(lines[i])&&!lines[i+1].startsWith('# ')&&lines[i+1].trim().isNotEmpty){
+      lines[i+1]=attachChordsByColumns(lines[i],lines[i+1]);
+      lines[i]='';
+    }
+  }
+  final cleaned=<String>[];
+  for(final line in lines){if(line.isEmpty&&cleaned.isNotEmpty&&cleaned.last.isEmpty)continue;cleaned.add(line);}
+  return normalize(cleaned.join('\n'));
+}
+Future<String> _ocrImageFile(File file)async{
+  final cfg=OCRConfig(language:'heb',engine:OCREngine.tesseract,options:{'preserve_interword_spaces':'1','tessedit_pageseg_mode':'6'});
+  return smartStructure(normalize(await TesseractOcr.extractText(file.path,config:cfg)));
+}
+Future<String> _ocrImageBytes(List<int> bytes,String extension)async{
+  final dir=await getTemporaryDirectory();
+  final file=File('\${dir.path}/bama_scan_\${DateTime.now().microsecondsSinceEpoch}.$extension');
+  await file.writeAsBytes(bytes,flush:true);
+  try{return await _ocrImageFile(file);}finally{if(await file.exists())await file.delete();}
+}
+Future<String> _ocrPdf(List<int> bytes)async{
+  final document=await pdfx.PdfDocument.openData(bytes);
+  final out=<String>[];
+  try{
+    for(int pageNo=1;pageNo<=document.pagesCount;pageNo++){
+      final page=await document.getPage(pageNo);
+      try{
+        final image=await page.render(width:page.width*2,height:page.height*2,format:pdfx.PdfPageImageFormat.PNG);
+        final dir=await getTemporaryDirectory();
+        final file=File('\${dir.path}/bama_pdf_\${DateTime.now().microsecondsSinceEpoch}_$pageNo.png');
+        await file.writeAsBytes(image.bytes,flush:true);
+        try{out.add(await _ocrImageFile(file));}finally{if(await file.exists())await file.delete();}
+      }finally{await page.close();}
+    }
+  }finally{await document.close();}
+  return smartStructure(normalize(out.join('\n\n')));
 }
 Future<String> smartExtractFile(String? path,List<int> bytes,String extension)async{
- final e=extension.toLowerCase();
- if(e=='txt')return normalize(utf8.decode(bytes,allowMalformed:true));
- if(e=='pdf'){final d=PdfDocument(inputBytes:bytes);try{return normalize(PdfTextExtractor(d).extractText());}finally{d.dispose();}}
- throw Exception('סריקת תמונות דורשת מנוע OCR ייעודי שעדיין לא הופעל בגרסה זו');
+  final e=extension.toLowerCase();
+  if(e=='txt')return smartStructure(normalize(utf8.decode(bytes,allowMalformed:true)));
+  if(e=='pdf'){
+    final text=extractPdfSmart(bytes);
+    final enough=text.trim().length>40&&(containsHebrew(text)||RegExp(r'\b[A-G](?:#|b)?(?:m|7|maj7)?\b').hasMatch(text));
+    return enough?text:await _ocrPdf(bytes);
+  }
+  if(['jpg','jpeg','png','webp','bmp'].contains(e))return await _ocrImageBytes(bytes,e=='jpg'||e=='jpeg'?'jpg':'png');
+  throw Exception('פורמט קובץ לא נתמך');
 }
-List<String> parseSongList(String raw){final out=<String>[];for(final line in raw.replaceAll('\r','').split('\n')){var x=line.trim();if(x.isEmpty)continue;x=x.replaceFirst(RegExp(r'^\s*(?:\d+[.)\-:]|[-•])\s*'),'');if(isChord(x)||looksLikeChordLine(x)||x.length>90)continue;if(RegExp(r'^(רשימת שירים|שירים|playlist|setlist)$',caseSensitive:false).hasMatch(x))continue;if(!out.contains(x))out.add(x);}return out;}
-String baseName(String path)=>path.split(Platform.pathSeparator).last.replaceFirst(RegExp(r'\.(txt|pdf|jpg|jpeg|png|webp|bmp)$',caseSensitive:false),'');
-String inferStyle(String path,List<String> styles){final p=path.toLowerCase();for(final s in styles){if(s!='כללי'&&p.contains(s.toLowerCase()))return s;}return 'כללי';}
-
 class SmartImport extends StatefulWidget{
   final Store store;final String mode;
   const SmartImport({super.key,required this.store,required this.mode});
