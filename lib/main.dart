@@ -321,7 +321,7 @@ class ChordLine extends StatelessWidget{
   }
 }
 List<(String?,String)> parseTokens(String line){
-  final ms=RegExp(r'\\[([^\\]]+)\\]').allMatches(line).toList();if(ms.isEmpty)return [(null,line)];
+  final ms=RegExp(r'\[([^\]]+)\]').allMatches(line).toList();if(ms.isEmpty)return [(null,line)];
   final out=< (String?,String)>[];int p=0;
   for(final m in ms){
     final before=line.substring(p,m.start);if(before.isNotEmpty)out.add((null,before));
@@ -333,25 +333,34 @@ List<(String?,String)> parseTokens(String line){
 }
 
 class Converter{
-  static final chord=RegExp(r'^[A-G][#b]?(?:m|maj|dim|sus|add)?\d*(?:/[A-G][#b]?)?);
-  static final heading=RegExp(r'^(בית|פזמון|מעבר|גשר|פתיחה|סיום|intro|verse|chorus|bridge|outro)\\b',caseSensitive:false);
+  static final chord=RegExp(r'^[A-G][#b]?(?:m|maj|dim|sus|add)?\d*(?:/[A-G][#b]?)?$');
+  static final heading=RegExp(r'^(בית|פזמון|מעבר|גשר|פתיחה|סיום|intro|verse|chorus|bridge|outro)\b',caseSensitive:false);
   static String convert(String input){
-    final a=input.replaceAll('\\r','').split('\\n'),out=<String>[];
+    final a=input.replaceAll('\r','').split('\n'),out=<String>[];
     for(int i=0;i<a.length;i++){
       final line=a[i],t=line.trim();
       if(t.isEmpty){out.add('');continue;}
-      if(line.contains('#')||RegExp(r'\\[[^\\]]+\\]').hasMatch(line)){out.add(line);continue;}
+      if(line.contains('#')||RegExp(r'\[[^\]]+\]').hasMatch(line)){out.add(line);continue;}
       if(t.length<=21&&heading.hasMatch(t)){out.add('# '+t);continue;}
-      final ms=RegExp(r'\\S+').allMatches(line).toList();
+      final ms=RegExp(r'\S+').allMatches(line).toList();
       if(ms.isNotEmpty&&ms.every((m)=>chord.hasMatch(m.group(0)!))){
         if(i+1<a.length&&a[i+1].trim().isNotEmpty){
           var next=a[i+1];
-          for(final m in ms.reversed){final at=math.min(m.start,next.length);next=next.substring(0,at)+'['+m.group(0)!+']'+next.substring(at);}
-          out.add(next);i++;
-        }else{out.add(ms.map((m)=>'['+m.group(0)!+']').join(' '));}
-      }else out.add(line);
+          for(final m in ms.reversed){
+            final at=m.start>next.length?next.length:m.start;
+            if(at>next.length) next=next.padRight(at);
+            next=next.substring(0,at)+'['+m.group(0)!+']'+next.substring(at);
+          }
+          out.add(next);
+          i++;
+        }else{
+          out.add(ms.map((m)=>'['+m.group(0)!+']').join(' '));
+        }
+      }else{
+        out.add(line);
+      }
     }
-    return out.join('\\n');
+    return out.join('\n');
   }
 }
 
@@ -360,79 +369,18 @@ int noteIndex(String n){
   n=n.replaceAll('Db','C#').replaceAll('Eb','D#').replaceAll('Gb','F#').replaceAll('Ab','G#').replaceAll('Bb','A#');
   return chrom.indexOf(n);
 }
-String moveNote(String n,int d){final i=noteIndex(n);if(i<0)return n;return chrom[(i+d)%12<0?(i+d)%12+12:(i+d)%12];}
+String moveNote(String n,int d){
+  final i=noteIndex(n);
+  if(i<0)return n;
+  final v=(i+d)%12;
+  return chrom[v<0?v+12:v];
+}
 String transposeChord(String chord,int d){
-  final m=RegExp(r'^([A-G](?:#|b)?)(.*?)(?:/([A-G](?:#|b)?))?).firstMatch(chord.trim());if(m==null)return chord;
-  final root=moveNote(m.group(1)!,d),suffix=m.group(2)??'',bass=m.group(3);return bass==null?root+suffix:root+suffix+'/'+moveNote(bass,d);
-}
-String transposeKey(String key,int d)=>transposeChord(key,d);
-);
-  static final heading=RegExp(r'^(בית|פזמון|מעבר|גשר|פתיחה|סיום|intro|verse|chorus|bridge|outro)\\b',caseSensitive:false);
-  static String convert(String input){
-    final a=input.replaceAll('\\r','').split('\\n'),out=<String>[];
-    for(int i=0;i<a.length;i++){
-      final line=a[i],t=line.trim();
-      if(t.isEmpty){out.add('');continue;}
-      if(line.contains('#')||RegExp(r'\\[[^\\]]+\\]').hasMatch(line)){out.add(line);continue;}
-      if(t.length<=21&&heading.hasMatch(t)){out.add('# '+t);continue;}
-      final ms=RegExp(r'\\S+').allMatches(line).toList();
-      if(ms.isNotEmpty&&ms.every((m)=>chord.hasMatch(m.group(0)!))){
-        if(i+1<a.length&&a[i+1].trim().isNotEmpty){
-          var next=a[i+1];
-          for(final m in ms.reversed){final at=math.min(m.start,next.length);next=next.substring(0,at)+'['+m.group(0)!+']'+next.substring(at);}
-          out.add(next);i++;
-        }else{out.add(ms.map((m)=>'['+m.group(0)!+']').join(' '));}
-      }else out.add(line);
-    }
-    return out.join('\\n');
-  }
-}
-
-const chrom=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
-int noteIndex(String n){
-  n=n.replaceAll('Db','C#').replaceAll('Eb','D#').replaceAll('Gb','F#').replaceAll('Ab','G#').replaceAll('Bb','A#');
-  return chrom.indexOf(n);
-}
-String moveNote(String n,int d){final i=noteIndex(n);if(i<0)return n;return chrom[(i+d)%12<0?(i+d)%12+12:(i+d)%12];}
-String transposeChord(String chord,int d){
-  final m=RegExp(r'^([A-G](?:#|b)?)(.*?)(?:/([A-G](?:#|b)?))?\$').firstMatch(chord.trim());if(m==null)return chord;
-  final root=moveNote(m.group(1)!,d),suffix=m.group(2)??'',bass=m.group(3);return bass==null?root+suffix:root+suffix+'/'+moveNote(bass,d);
-}
-String transposeKey(String key,int d)=>transposeChord(key,d);
-).firstMatch(chord.trim());if(m==null)return chord;
-  final root=moveNote(m.group(1)!,d),suffix=m.group(2)??'',bass=m.group(3);return bass==null?root+suffix:root+suffix+'/'+moveNote(bass,d);
-}
-String transposeKey(String key,int d)=>transposeChord(key,d);
-);
-  static final heading=RegExp(r'^(בית|פזמון|מעבר|גשר|פתיחה|סיום|intro|verse|chorus|bridge|outro)\\b',caseSensitive:false);
-  static String convert(String input){
-    final a=input.replaceAll('\\r','').split('\\n'),out=<String>[];
-    for(int i=0;i<a.length;i++){
-      final line=a[i],t=line.trim();
-      if(t.isEmpty){out.add('');continue;}
-      if(line.contains('#')||RegExp(r'\\[[^\\]]+\\]').hasMatch(line)){out.add(line);continue;}
-      if(t.length<=21&&heading.hasMatch(t)){out.add('# '+t);continue;}
-      final ms=RegExp(r'\\S+').allMatches(line).toList();
-      if(ms.isNotEmpty&&ms.every((m)=>chord.hasMatch(m.group(0)!))){
-        if(i+1<a.length&&a[i+1].trim().isNotEmpty){
-          var next=a[i+1];
-          for(final m in ms.reversed){final at=math.min(m.start,next.length);next=next.substring(0,at)+'['+m.group(0)!+']'+next.substring(at);}
-          out.add(next);i++;
-        }else{out.add(ms.map((m)=>'['+m.group(0)!+']').join(' '));}
-      }else out.add(line);
-    }
-    return out.join('\\n');
-  }
-}
-
-const chrom=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
-int noteIndex(String n){
-  n=n.replaceAll('Db','C#').replaceAll('Eb','D#').replaceAll('Gb','F#').replaceAll('Ab','G#').replaceAll('Bb','A#');
-  return chrom.indexOf(n);
-}
-String moveNote(String n,int d){final i=noteIndex(n);if(i<0)return n;return chrom[(i+d)%12<0?(i+d)%12+12:(i+d)%12];}
-String transposeChord(String chord,int d){
-  final m=RegExp(r'^([A-G](?:#|b)?)(.*?)(?:/([A-G](?:#|b)?))?\$').firstMatch(chord.trim());if(m==null)return chord;
-  final root=moveNote(m.group(1)!,d),suffix=m.group(2)??'',bass=m.group(3);return bass==null?root+suffix:root+suffix+'/'+moveNote(bass,d);
+  final m=RegExp(r'^([A-G](?:#|b)?)(.*?)(?:/([A-G](?:#|b)?))?$').firstMatch(chord.trim());
+  if(m==null)return chord;
+  final root=moveNote(m.group(1)!,d);
+  final suffix=m.group(2)??'';
+  final bass=m.group(3);
+  return bass==null?root+suffix:root+suffix+'/'+moveNote(bass,d);
 }
 String transposeKey(String key,int d)=>transposeChord(key,d);
