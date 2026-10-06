@@ -55,7 +55,7 @@ class Store extends ChangeNotifier {
   Future<void> load() async {
     final p=await SharedPreferences.getInstance(), raw=p.getString('bama_v4') ?? p.getString('bama_v3');
     if(raw==null){ songs=demo(); lists=[Setlist(id:uid(),name:'הופעה – יום שישי',ids:songs.map((x)=>x.id).toList()),Setlist(id:uid(),name:'חזרות',ids:songs.take(2).map((x)=>x.id).toList())]; await save(); }
-    else { final j=jsonDecode(raw); songs=(j['songs'] as List? ?? []).map((x)=>Song.fromJson(x)).toList(); lists=(j['lists'] as List? ?? []).map((x)=>Setlist.fromJson(x)).toList(); folders=(j['folders'] as List? ?? []).map((x)=>Folder.fromJson(x)).toList(); styles=List<String>.from(j['styles']??styles); theme=j['theme']??0; }
+    else { final j=jsonDecode(raw); songs=(j['songs'] as List? ?? []).map((x)=>Song.fromJson(x)).toList(); lists=(j['lists'] as List? ?? []).map((x)=>Setlist.fromJson(x)).toList(); folders=(j['folders'] as List? ?? []).map((x)=>Folder.fromJson(x)).toList(); styles=List<String>.from(j['styles']??styles); theme=j['theme']??0; for(final l in lists){if(l.names.isEmpty&&l.ids.isNotEmpty){l.names=l.ids.map((id)=>song(id)?.title??'').where((x)=>x.isNotEmpty).toList();}} }
   }
   Future<void> save() async { final p=await SharedPreferences.getInstance(); await p.setString('bama_v4',jsonEncode({'songs':songs.map((x)=>x.toJson()).toList(),'lists':lists.map((x)=>x.toJson()).toList(),'folders':folders.map((x)=>x.toJson()).toList(),'styles':styles,'theme':theme})); notifyListeners(); }
   Song? song(String id){for(final s in songs){if(s.id==id)return s;}return null;}
