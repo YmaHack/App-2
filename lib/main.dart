@@ -135,13 +135,33 @@ class _AddSongsState extends State<AddSongs>{
   ]))));}
 }
 
-class Songs extends StatefulWidget{final Store store;const Songs({super.key,required this.store});@override State<Songs> createState()=>_SongsState();}
+class Songs extends StatefulWidget{
+  final Store store;
+  const Songs({super.key,required this.store});
+  @override State<Songs> createState()=>_SongsState();
+}
 class _SongsState extends State<Songs>{
   String q='';
-  @override Widget build(BuildContext c){final a=widget.store.songs.where((s)=>q.isEmpty||s.title.contains(q)||s.artist.contains(q)||s.style.contains(q)).toList();return Scaffold(appBar:AppBar(title:const Text('כל השירים'),actions:[IconButton.filledTonal(onPressed:()=>Navigator.push(c,MaterialPageRoute(builder:(_)=>Editor(store:widget.store))),icon:const Icon(Icons.add))]),body:Column(children:[
-    Padding(padding:const EdgeInsets.all(14),child:TextField(onChanged:(v)=>setState(()=>q=v),decoration:const InputDecoration(prefixIcon:Icon(Icons.search),hintText:'חפש שיר, אמן או סגנון'))),
-    Expanded(child:ListView.separated(padding:const EdgeInsets.symmetric(horizontal:14),itemCount:a.length,separatorBuilder:(_,__)=>const SizedBox(height:8),itemBuilder:(_,i)=>SongTile(song:a[i],onTap:()=>Navigator.push(c,MaterialPageRoute(builder:(_)=>Player(store:widget.store,song:a[i]))))))
-  ]);}
+  @override Widget build(BuildContext c){
+    final a=widget.store.songs.where((s)=>q.isEmpty||s.title.contains(q)||s.artist.contains(q)||s.style.contains(q)).toList();
+    return Scaffold(
+      appBar:AppBar(title:const Text('כל השירים'),actions:[
+        IconButton.filledTonal(onPressed:()=>Navigator.push(c,MaterialPageRoute(builder:(_)=>Editor(store:widget.store))),icon:const Icon(Icons.add))
+      ]),
+      body:Column(children:[
+        Padding(padding:const EdgeInsets.all(14),child:TextField(onChanged:(v)=>setState(()=>q=v),decoration:const InputDecoration(prefixIcon:Icon(Icons.search),hintText:'חפש שיר, אמן או סגנון'))),
+        Expanded(child:ListView.separated(
+          padding:const EdgeInsets.symmetric(horizontal:14),
+          itemCount:a.length,
+          separatorBuilder:(_,__)=>const SizedBox(height:8),
+          itemBuilder:(_,i){
+            final song=a[i];
+            return SongTile(song:song,onTap:()=>Navigator.push(c,MaterialPageRoute(builder:(_)=>Player(store:widget.store,song:song))));
+          }
+        ))
+      ])
+    );
+  }
 }
 
 class SongTile extends StatelessWidget{
@@ -154,16 +174,54 @@ class SongTile extends StatelessWidget{
 }
 
 class Player extends StatefulWidget{
-  final Store store;final Song song;const Player({super.key,required this.store,required this.song});@override State<Player> createState()=>_PlayerState();
+  final Store store; final Song song;
+  const Player({super.key,required this.store,required this.song});
+  @override State<Player> createState()=>_PlayerState();
 }
 class _PlayerState extends State<Player>{
-  int tr=0;double size=19;Timer? timer;final sc=ScrollController();
+  int tr=0; double size=19; Timer? timer; final sc=ScrollController();
   @override void dispose(){timer?.cancel();sc.dispose();super.dispose();}
-  void play(){timer?.cancel();timer=Timer.periodic(const Duration(milliseconds:90),(_){if(!sc.hasClients)return;if(sc.offset>=sc.position.maxScrollExtent){timer?.cancel();setState((){});}else sc.jumpTo(math.min(sc.position.maxScrollExtent,sc.offset+1.5));});setState((){});}
-  @override Widget build(BuildContext c){final sec=parse(widget.song.text);return Scaffold(appBar:AppBar(title:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text(widget.song.title),Text(widget.song.style+'  •  '+shift(widget.song.key,tr),style:const TextStyle(fontSize:11,color:soft))]),actions:[IconButton(onPressed:()=>Navigator.push(c,MaterialPageRoute(builder:(_)=>Editor(store:widget.store,song:widget.song))),icon:const Icon(Icons.edit))]),body:Column(children:[
-    Container(margin:const EdgeInsets.all(10),padding:const EdgeInsets.symmetric(horizontal:6,vertical:5),decoration:BoxDecoration(color:card,borderRadius:BorderRadius.circular(17)),child:Row(children:[IconButton.filled(onPressed:(){if(timer!=null){timer?.cancel();setState((){});}else play();},icon:Icon(timer!=null?Icons.pause:Icons.play_arrow)),IconButton(onPressed:()=>setState(()=>tr--),icon:const Icon(Icons.remove)),Text(tr==0?'מקורי':(tr>0?'+':'')+tr.toString(),style:const TextStyle(color:chord,fontWeight:FontWeight.bold)),IconButton(onPressed:()=>setState(()=>tr++),icon:const Icon(Icons.add)),const Icon(Icons.text_fields,size:18,color:soft),Expanded(child:Slider(min:16,max:30,value:size,onChanged:(v)=>setState(()=>size=v))) ])),
-    Expanded(child:ListView.builder(controller:sc,padding:const EdgeInsets.fromLTRB(15,5,15,80),itemCount:sec.length,itemBuilder:(_,i)=>SectionView(section:sec[i],size:size,tr:tr)))
-  ]);}
+  void play(){
+    timer?.cancel();
+    timer=Timer.periodic(const Duration(milliseconds:90),(_){
+      if(!sc.hasClients)return;
+      if(sc.offset>=sc.position.maxScrollExtent){timer?.cancel();setState((){});}
+      else sc.jumpTo(math.min(sc.position.maxScrollExtent,sc.offset+1.5));
+    });
+    setState((){});
+  }
+  @override Widget build(BuildContext c){
+    final sec=parse(widget.song.text);
+    return Scaffold(
+      appBar:AppBar(
+        title:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+          Text(widget.song.title),
+          Text(widget.song.style+'  •  '+shift(widget.song.key,tr),style:const TextStyle(fontSize:11,color:soft))
+        ]),
+        actions:[IconButton(onPressed:()=>Navigator.push(c,MaterialPageRoute(builder:(_)=>Editor(store:widget.store,song:widget.song))),icon:const Icon(Icons.edit))]
+      ),
+      body:Column(children:[
+        Container(
+          margin:const EdgeInsets.all(10),
+          padding:const EdgeInsets.symmetric(horizontal:6,vertical:5),
+          decoration:BoxDecoration(color:card,borderRadius:BorderRadius.circular(17)),
+          child:Row(children:[
+            IconButton.filled(onPressed:(){if(timer!=null){timer?.cancel();setState((){});}else{play();}},icon:Icon(timer!=null?Icons.pause:Icons.play_arrow)),
+            IconButton(onPressed:()=>setState(()=>tr--),icon:const Icon(Icons.remove)),
+            Text(tr==0?'מקורי':(tr>0?'+':'')+tr.toString(),style:const TextStyle(color:chord,fontWeight:FontWeight.bold)),
+            IconButton(onPressed:()=>setState(()=>tr++),icon:const Icon(Icons.add)),
+            const Icon(Icons.text_fields,size:18,color:soft),
+            Expanded(child:Slider(min:16,max:30,value:size,onChanged:(v)=>setState(()=>size=v)))
+          ])
+        ),
+        Expanded(child:ListView.builder(
+          controller:sc,padding:const EdgeInsets.fromLTRB(15,5,15,80),
+          itemCount:sec.length,
+          itemBuilder:(_,i)=>SectionView(section:sec[i],size:size,tr:tr)
+        ))
+      ])
+    );
+  }
 }
 
 class Section{String name;Color color;List<String> lines;Section(this.name,this.color,this.lines);}
