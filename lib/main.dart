@@ -172,7 +172,7 @@ class _LibraryState extends State<Library>{
       floatingActionButton:Wrap(spacing:8,children:[
         FloatingActionButton.extended(heroTag:'f',onPressed:newFolder,icon:const Icon(Icons.create_new_folder_outlined),label:const Text('תיקייה חדשה')),
         FloatingActionButton.extended(heroTag:'i',onPressed:importFile,icon:const Icon(Icons.file_upload_outlined),label:const Text('ייבוא קובץ')),
-        FloatingActionButton.extended(heroTag:'s',backgroundColor:primary,onPressed:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>Editor(widget.store,Song(uid(),'שיר חדש',folder!,'C','# בית\\n'),true))),icon:const Icon(Icons.add),label:const Text('שיר חדש')),
+        FloatingActionButton.extended(heroTag:'s',backgroundColor:primary,onPressed:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>Editor(widget.store,Song(uid(),'שיר חדש',folder!,'C','# בית\\n'),isNew:true))),icon:const Icon(Icons.add),label:const Text('שיר חדש')),
       ]),
     );
   }
