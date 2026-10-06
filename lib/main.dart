@@ -2,10 +2,15 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
+import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:syncfusion_flutter_pdf/pdf.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import 'package:flutter_tesseract_ocr/flutter_tesseract_ocr.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:pdf_renderer/pdf_renderer.dart' as pdf_renderer;
 
 const bg=Color(0xFF0B1020), card=Color(0xFF151D33), accent=Color(0xFF5DE4C7), accent2=Color(0xFF7C83FD), soft=Color(0xFF9BA8C4), chord=Color(0xFFFFD166);
 ThemeData appTheme(int t){
@@ -84,8 +89,12 @@ List<Song> demo()=>[
  Song(id:uid(),title:'קצב הלילה',style:'קצבי',key:'G',text:'# בית\nG D Em C\nהלילה מתחיל עכשיו\n\n# פזמון\n[G]בואו נרים את הקצב\n[D]ונשיר ביחד'),
 ];
 
-class LogoMark extends StatelessWidget{final double size;const LogoMark({super.key,this.size=52});@override Widget build(BuildContext c)=>Container(width:size,height:size,decoration:BoxDecoration(shape:BoxShape.circle,gradient:const LinearGradient(colors:[accent,accent2])),child:Stack(alignment:Alignment.center,children:[Icon(Icons.stadium_rounded,color:Colors.white,size:size*.72),Icon(Icons.music_note_rounded,color:Colors.white,size:size*.38)]));}
-class Home extends StatefulWidget {
+class LogoMark extends StatelessWidget{
+  final double size;
+  const LogoMark({super.key,this.size=52});
+  @override Widget build(BuildContext c)=>SizedBox(width:size,height:size,child:SvgPicture.asset('assets/logo.svg',semanticsLabel:'במה',fit:BoxFit.contain));
+}
+class Home extends StatefulWidget {class Home extends StatefulWidget {
   final Store store; const Home({super.key,required this.store});
   @override State<Home> createState()=>_HomeState();
 }
@@ -177,7 +186,7 @@ class FolderCard extends StatelessWidget{
     if(a=='move'&&c.mounted){final id=await chooseFolder(c,store,exclude:folder.id);if(id!=null){folder.parentId=id;await store.save();}}
     if(a=='delete'&&c.mounted&&await confirmDelete(c,'למחוק את התיקייה? הפלייליסטים שבתוכה יעברו החוצה.'))await store.deleteFolder(folder);
   }
-  @override Widget build(BuildContext c)=>Card(child:InkWell(onTap:()=>Navigator.push(c,MaterialPageRoute(builder:(_)=>FolderView(store:store,folder:folder))),onLongPress:()=>act(c),child:ListTile(leading:const Icon(Icons.folder_rounded,color:accent),title:Text(folder.name,style:const TextStyle(fontWeight:FontWeight.w800)),subtitle:const Text('לחיצה ארוכה: עריכה • מחיקה • שינוי מיקום'),trailing:const Icon(Icons.chevron_left))));
+  @override Widget build(BuildContext c)=>Card(child:InkWell(onTap:()=>Navigator.push(c,MaterialPageRoute(builder:(_)=>FolderView(store:store,folder:folder))),onLongPress:()=>act(c),child:ListTile(leading:const Icon(Icons.folder_rounded,color:accent),title:Text(folder.name,style:const TextStyle(fontWeight:FontWeight.w800)),trailing:const Icon(Icons.chevron_left))));
 }
 class PlaylistCard extends StatelessWidget{
   final Store store;final Setlist playlist;const PlaylistCard({super.key,required this.store,required this.playlist});
@@ -187,48 +196,35 @@ class PlaylistCard extends StatelessWidget{
     if(a=='move'&&c.mounted){final id=await chooseFolder(c,store);if(id!=null)await store.movePlaylist(playlist,id);}
     if(a=='delete'&&c.mounted&&await confirmDelete(c,'למחוק את הפלייליסט?'))await store.deleteList(playlist);
   }
-  @override Widget build(BuildContext c)=>Card(child:InkWell(onTap:()=>Navigator.push(c,MaterialPageRoute(builder:(_)=>PlaylistView(store:store,playlist:playlist))),onLongPress:()=>act(c),child:ListTile(leading:const Icon(Icons.queue_music_rounded,color:accent),title:Text(playlist.name,style:const TextStyle(fontWeight:FontWeight.w800)),subtitle:Text(playlist.names.length.toString()+' שירים • לחיצה ארוכה לניהול'),trailing:const Icon(Icons.chevron_left))));
+  @override Widget build(BuildContext c)=>Card(child:InkWell(onTap:()=>Navigator.push(c,MaterialPageRoute(builder:(_)=>PlaylistView(store:store,playlist:playlist))),onLongPress:()=>act(c),child:ListTile(leading:const Icon(Icons.queue_music_rounded,color:accent),title:Text(playlist.name,style:const TextStyle(fontWeight:FontWeight.w800)),subtitle:Text(playlist.names.length.toString()+' שירים'),trailing:const Icon(Icons.chevron_left))));
 }
 class FolderView extends StatelessWidget{
   final Store store;final Folder folder;const FolderView({super.key,required this.store,required this.folder});
   @override Widget build(BuildContext c){final folders=store.folders.where((x)=>x.parentId==folder.id).toList();final lists=store.lists.where((x)=>x.folderId==folder.id).toList();return Scaffold(appBar:AppBar(title:Text(folder.name)),body:ListView(padding:const EdgeInsets.all(15),children:[...folders.map((f)=>FolderCard(store:store,folder:f)),...lists.map((p)=>PlaylistCard(store:store,playlist:p))]));}
 }
 class PlaylistView extends StatefulWidget{
-  final Store store;
-  final Setlist playlist;
+  final Store store; final Setlist playlist;
   const PlaylistView({super.key,required this.store,required this.playlist});
   @override State<PlaylistView> createState()=>_PlaylistViewState();
 }
 class _PlaylistViewState extends State<PlaylistView>{
-  @override Widget build(BuildContext c){
-    return Scaffold(
-      appBar:AppBar(title:Text(widget.playlist.name),actions:[IconButton(onPressed:()=>addName(c),icon:const Icon(Icons.add))]),
-      body:widget.playlist.names.isEmpty
-        ? const Center(child:Text('הפלייליסט ריק. לחץ + כדי להוסיף שם שיר.'))
-        : ReorderableListView.builder(
-            padding:const EdgeInsets.all(14),
-            itemCount:widget.playlist.names.length,
-            onReorder:(oldIndex,newIndex)async{
-              await widget.store.reorderPlaylistNames(widget.playlist,oldIndex,newIndex);
-              setState((){});
-            },
-            itemBuilder:(_,i)=>ListTile(
-              key:ValueKey(widget.playlist.id+'-'+i.toString()),
-              leading:CircleAvatar(radius:14,child:Text((i+1).toString())),
-              title:Text(widget.playlist.names[i],style:const TextStyle(fontSize:17,fontWeight:FontWeight.w700)),
-              trailing:const Icon(Icons.drag_handle),
-              onLongPress:()=>nameActions(c,i),
-            ),
-          ),
-    );
-  }
+  @override Widget build(BuildContext c)=>Scaffold(
+    appBar:AppBar(title:Text(widget.playlist.name),actions:[IconButton(onPressed:()=>addName(c),icon:const Icon(Icons.add))]),
+    body:widget.playlist.names.isEmpty
+      ? const Center(child:Text('הפלייליסט ריק. לחץ + כדי להוסיף שם שיר.'))
+      : ReorderableListView.builder(
+          padding:const EdgeInsets.all(14),itemCount:widget.playlist.names.length,
+          onReorder:(oldIndex,newIndex)async{await widget.store.reorderPlaylistNames(widget.playlist,oldIndex,newIndex);if(mounted)setState((){});},
+          itemBuilder:(_,i){
+            final name=widget.playlist.names[i];
+            return ListTile(key:ValueKey(widget.playlist.id+':'+name),leading:CircleAvatar(radius:14,child:Text((i+1).toString())),title:Text(name,style:const TextStyle(fontSize:17,fontWeight:FontWeight.w700)),trailing:const Icon(Icons.drag_handle),onLongPress:()=>nameActions(c,i));
+          },
+        ),
+  );
   Future<void> addName(BuildContext c)async{
     final t=TextEditingController();
-    final n=await showDialog<String>(context:c,builder:(_)=>AlertDialog(title:const Text('הוסף שיר לפלייליסט'),content:TextField(controller:t,autofocus:true),actions:[
-      TextButton(onPressed:()=>Navigator.pop(c),child:const Text('ביטול')),
-      FilledButton(onPressed:()=>Navigator.pop(c,t.text.trim()),child:const Text('הוסף'))
-    ]));
-    if(n!=null&&n.isNotEmpty){widget.playlist.names=[...widget.playlist.names,n];await widget.store.save();setState((){});}
+    final n=await showDialog<String>(context:c,builder:(_)=>AlertDialog(title:const Text('הוסף שיר לפלייליסט'),content:TextField(controller:t,autofocus:true),actions:[TextButton(onPressed:()=>Navigator.pop(c),child:const Text('ביטול')),FilledButton(onPressed:()=>Navigator.pop(c,t.text.trim()),child:const Text('הוסף'))]));
+    if(n!=null&&n.isNotEmpty&&!widget.playlist.names.contains(n)){widget.playlist.names=[...widget.playlist.names,n];await widget.store.save();if(mounted)setState((){});}
   }
   Future<void> nameActions(BuildContext c,int i)async{
     final a=await showModalBottomSheet<String>(context:c,builder:(_)=>SafeArea(child:Column(mainAxisSize:MainAxisSize.min,children:[
@@ -238,17 +234,15 @@ class _PlaylistViewState extends State<PlaylistView>{
     ])));
     if(a=='edit'&&c.mounted){
       final t=TextEditingController(text:widget.playlist.names[i]);
-      final n=await showDialog<String>(context:c,builder:(_)=>AlertDialog(title:const Text('עריכת שם שיר'),content:TextField(controller:t),actions:[
-        TextButton(onPressed:()=>Navigator.pop(c),child:const Text('ביטול')),
-        FilledButton(onPressed:()=>Navigator.pop(c,t.text.trim()),child:const Text('שמור'))
-      ]));
-      if(n!=null&&n.isNotEmpty){final a2=List<String>.from(widget.playlist.names);a2[i]=n;widget.playlist.names=a2;await widget.store.save();setState((){});}
+      final n=await showDialog<String>(context:c,builder:(_)=>AlertDialog(title:const Text('עריכת שם שיר'),content:TextField(controller:t),actions:[TextButton(onPressed:()=>Navigator.pop(c),child:const Text('ביטול')),FilledButton(onPressed:()=>Navigator.pop(c,t.text.trim()),child:const Text('שמור'))]));
+      if(n!=null&&n.isNotEmpty){final a2=List<String>.from(widget.playlist.names);if(!a2.asMap().entries.any((e)=>e.key!=i&&e.value==n)){a2[i]=n;widget.playlist.names=a2;await widget.store.save();if(mounted)setState((){});}}
     }
     if(a=='delete'){await widget.store.removePlaylistName(widget.playlist,i);if(mounted)setState((){});}
-    if(a=='move'&&c.mounted)ScaffoldMessenger.of(c).showSnackBar(const SnackBar(content:Text('גרור את השיר למיקום הרצוי')));
+    if(a=='move'&&c.mounted){final pos=await choosePosition(c,i,widget.playlist.names.length);if(pos!=null&&pos!=i){await widget.store.reorderPlaylistNames(widget.playlist,i,pos);if(mounted)setState((){});}}
   }
 }
-Future<String?> chooseFolder(BuildContext c,Store store,{String exclude=''})async{
+Future<int?> choosePosition(BuildContext c,int current,int count)async=>showModalBottomSheet<int>(context:c,builder:(_)=>SafeArea(child:ListView.builder(shrinkWrap:true,itemCount:count,itemBuilder:(_,i)=>ListTile(leading:Icon(i==current?Icons.radio_button_checked:Icons.radio_button_unchecked),title:Text('מיקום '+(i+1).toString()),onTap:()=>Navigator.pop(c,i)))));
+Future<String?> chooseFolderFuture<String?> chooseFolder(BuildContext c,Store store,{String exclude=''})async{
   final v=await showModalBottomSheet<String>(context:c,builder:(_)=>SafeArea(child:ListView(children:[const ListTile(title:Text('בחר תיקייה')),ListTile(leading:const Icon(Icons.home_outlined),title:const Text('ללא תיקייה'),onTap:()=>Navigator.pop(c,'')),...store.folders.where((f)=>f.id!=exclude).map((f)=>ListTile(leading:const Icon(Icons.folder_outlined),title:Text(f.name),onTap:()=>Navigator.pop(c,f.id)))])));
   return v;
 }
@@ -267,47 +261,51 @@ class _AddSongsState extends State<AddSongs>{
 }
 
 class Songs extends StatefulWidget{
-  final Store store;
-  const Songs({super.key,required this.store});
+  final Store store; const Songs({super.key,required this.store});
   @override State<Songs> createState()=>_SongsState();
 }
 class _SongsState extends State<Songs>{
-  String q='';
+  String q=''; bool selecting=false; final Set<String> selected={};
+  void toggleSelection(String id){setState((){if(selected.contains(id))selected.remove(id);else selected.add(id);if(selected.isEmpty)selecting=false;});}
+  void startSelection(String id){setState((){selecting=true;selected.add(id);});}
+  void clearSelection()=>setState((){selected.clear();selecting=false;});
+  Future<void> bulkDelete(BuildContext c)async{if(selected.isEmpty)return;if(!await confirmDelete(c,'למחוק '+selected.length.toString()+' שירים?'))return;for(final id in Set<String>.from(selected))await widget.store.deleteSong(id);clearSelection();}
+  Future<void> bulkMove(BuildContext c)async{if(selected.isEmpty)return;final folder=await chooseFolder(c,widget.store);if(folder==null)return;for(final id in Set<String>.from(selected)){final s=widget.store.song(id);if(s!=null)await widget.store.moveSong(s,folder);}clearSelection();}
   @override Widget build(BuildContext c){
     final a=widget.store.songs.where((s)=>q.isEmpty||s.title.contains(q)||s.artist.contains(q)||s.style.contains(q)).toList();
     return Scaffold(
-      appBar:AppBar(title:const Text('שירים'),actions:[IconButton(onPressed:()=>Navigator.push(c,MaterialPageRoute(builder:(_)=>SmartImport(store:widget.store,mode:'songs'))),icon:const Icon(Icons.folder_copy_outlined)),IconButton.filledTonal(onPressed:()=>Navigator.push(c,MaterialPageRoute(builder:(_)=>Editor(store:widget.store))),icon:const Icon(Icons.add))]),
+      appBar:AppBar(
+        title:Text(selecting?selected.length.toString()+' נבחרו':'שירים'),
+        leading:selecting?IconButton(onPressed:clearSelection,icon:const Icon(Icons.close)):null,
+        actions:selecting?[
+          IconButton(tooltip:'בחר הכל',onPressed:()=>setState((){selected..clear()..addAll(a.map((s)=>s.id));}),icon:const Icon(Icons.select_all)),
+          IconButton(tooltip:'העבר לתיקייה',onPressed:()=>bulkMove(c),icon:const Icon(Icons.drive_file_move_outlined)),
+          IconButton(tooltip:'מחק',onPressed:()=>bulkDelete(c),icon:const Icon(Icons.delete_outline)),
+        ]:[
+          IconButton(tooltip:'בחירה מרובה',onPressed:()=>setState(()=>selecting=true),icon:const Icon(Icons.checklist)),
+          IconButton(onPressed:()=>Navigator.push(c,MaterialPageRoute(builder:(_)=>SmartImport(store:widget.store,mode:'songs'))),icon:const Icon(Icons.folder_copy_outlined)),
+          IconButton.filledTonal(onPressed:()=>Navigator.push(c,MaterialPageRoute(builder:(_)=>Editor(store:widget.store))),icon:const Icon(Icons.add)),
+        ],
+      ),
       body:Column(children:[
         Padding(padding:const EdgeInsets.all(14),child:TextField(onChanged:(v)=>setState(()=>q=v),decoration:const InputDecoration(prefixIcon:Icon(Icons.search),hintText:'חפש שיר, אמן או סגנון'))),
-        Expanded(child:ListView.separated(
-          padding:const EdgeInsets.symmetric(horizontal:14),
-          itemCount:a.length,
-          separatorBuilder:(_,__)=>const SizedBox(height:8),
-          itemBuilder:(_,i){
-            final song=a[i];
-            return SongTile(song:song,onTap:()=>Navigator.push(c,MaterialPageRoute(builder:(_)=>Player(store:widget.store,song:song))));
-          }
-        ))
+        Expanded(child:ListView.separated(padding:const EdgeInsets.symmetric(horizontal:14),itemCount:a.length,separatorBuilder:(_,__)=>const SizedBox(height:8),itemBuilder:(_,i){
+          final song=a[i],isSelected=selected.contains(song.id);
+          return SongTile(song:song,selected:isSelected,onLongPress:()=>startSelection(song.id),onTap:()=>selecting?toggleSelection(song.id):Navigator.push(c,MaterialPageRoute(builder:(_)=>Player(store:widget.store,song:song))));
+        }))
       ])
     );
   }
 }
-
 class SongTile extends StatelessWidget{
-  final Song song;final VoidCallback onTap;const SongTile({super.key,required this.song,required this.onTap});
-  @override Widget build(BuildContext c)=>Material(color:card,borderRadius:BorderRadius.circular(19),child:InkWell(onTap:onTap,borderRadius:BorderRadius.circular(19),child:Padding(padding:const EdgeInsets.all(14),child:Row(children:[
-    Container(width:46,height:46,decoration:BoxDecoration(color:accent.withOpacity(.13),borderRadius:BorderRadius.circular(14)),child:const Icon(Icons.music_note,color:accent)),
-    const SizedBox(width:12),Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text(song.title,style:const TextStyle(fontWeight:FontWeight.bold,fontSize:16)),const SizedBox(height:4),Text(song.style+'  •  '+(song.artist.isEmpty?'ללא אמן':song.artist),style:const TextStyle(color:soft,fontSize:12))])),
-    Text(song.key,style:const TextStyle(color:chord,fontWeight:FontWeight.w800))
+  final Song song; final bool selected; final VoidCallback onTap,onLongPress;
+  const SongTile({super.key,required this.song,required this.onTap,required this.onLongPress,this.selected=false});
+  @override Widget build(BuildContext c)=>Material(color:selected?Theme.of(c).colorScheme.primaryContainer:card,borderRadius:BorderRadius.circular(19),child:InkWell(onTap:onTap,onLongPress:onLongPress,borderRadius:BorderRadius.circular(19),child:Padding(padding:const EdgeInsets.all(14),child:Row(children:[
+    selected?Container(width:46,height:46,decoration:BoxDecoration(color:Theme.of(c).colorScheme.primary,borderRadius:BorderRadius.circular(14)),child:const Icon(Icons.check,color:Colors.white)):Container(width:46,height:46,decoration:BoxDecoration(color:accent.withOpacity(.13),borderRadius:BorderRadius.circular(14)),child:const Icon(Icons.music_note,color:accent)),
+    const SizedBox(width:12),Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text(song.title,style:const TextStyle(fontWeight:FontWeight.bold,fontSize:16)),const SizedBox(height:4),Text(song.style+' • '+(song.artist.isEmpty?'ללא אמן':song.artist),style:const TextStyle(color:soft,fontSize:12))])),Text(song.key,style:const TextStyle(color:chord,fontWeight:FontWeight.w800))
   ]))));
 }
-
-class LongSongTile extends StatelessWidget{
-  final Store store;final Song song;const LongSongTile({super.key,required this.store,required this.song});
-  Future<void> act(BuildContext c)async{final a=await showModalBottomSheet<String>(context:c,builder:(_)=>SafeArea(child:Column(mainAxisSize:MainAxisSize.min,children:[ListTile(leading:const Icon(Icons.edit),title:const Text('עריכה'),onTap:()=>Navigator.pop(c,'edit')),ListTile(leading:const Icon(Icons.drive_file_move_outlined),title:const Text('שינוי מיקום'),onTap:()=>Navigator.pop(c,'move')),ListTile(leading:const Icon(Icons.delete_outline,color:Colors.redAccent),title:const Text('מחיקה'),onTap:()=>Navigator.pop(c,'delete'))])));if(a=='edit'&&c.mounted)Navigator.push(c,MaterialPageRoute(builder:(_)=>Editor(store:store,song:song)));if(a=='move'&&c.mounted){final id=await chooseFolder(c,store);if(id!=null)await store.moveSong(song,id);}if(a=='delete'&&c.mounted&&await confirmDelete(c,'למחוק את השיר?'))await store.deleteSong(song.id);}
-  @override Widget build(BuildContext c)=>Material(color:card,borderRadius:BorderRadius.circular(19),child:InkWell(onTap:()=>Navigator.push(c,MaterialPageRoute(builder:(_)=>Player(store:store,song:song))),onLongPress:()=>act(c),borderRadius:BorderRadius.circular(19),child:Padding(padding:const EdgeInsets.all(14),child:Row(children:[Container(width:46,height:46,decoration:BoxDecoration(color:accent.withOpacity(.13),borderRadius:BorderRadius.circular(14)),child:const Icon(Icons.music_note,color:accent)),const SizedBox(width:12),Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text(song.title,style:const TextStyle(fontWeight:FontWeight.bold,fontSize:16)),const SizedBox(height:4),Text(song.style+' • '+(song.artist.isEmpty?'ללא אמן':song.artist),style:const TextStyle(color:soft,fontSize:12))])),Text(song.key,style:const TextStyle(color:chord,fontWeight:FontWeight.w800))]))));
-}
-class Player extends StatefulWidget{
+class Player extends StatefulWidget{class Player extends StatefulWidget{
   final Store store; final Song song;
   const Player({super.key,required this.store,required this.song});
   @override State<Player> createState()=>_PlayerState();
@@ -407,7 +405,7 @@ class _EditorState extends State<Editor>{
   late TextEditingController title,artist,style,key,body;String? listId;
   @override void initState(){super.initState();final s=widget.song;title=TextEditingController(text:s?.title??'');artist=TextEditingController(text:s?.artist??'');style=TextEditingController(text:s?.style??'כללי');key=TextEditingController(text:s?.key??'C');body=TextEditingController(text:s?.text??'# בית\n');listId=widget.store.lists.isEmpty?null:widget.store.lists.first.id;}
   @override void dispose(){title.dispose();artist.dispose();style.dispose();key.dispose();body.dispose();super.dispose();}
-  Future<void> importFile()async{final r=await FilePicker.platform.pickFiles(withData:true,type:FileType.custom,allowedExtensions:['txt','pdf']);if(r==null||r.files.single.bytes==null)return;try{final f=r.files.single;final t=f.extension?.toLowerCase()=='pdf'?extractPdfSmart(f.bytes!):utf8.decode(f.bytes!,allowMalformed:true);body.text=normalize(t);if(title.text.trim().isEmpty)title.text=f.name.replaceAll(RegExp(r'\.(txt|pdf)$',caseSensitive:false),'');setState((){});}catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('שגיאה בייבוא: '+e.toString())));}}
+  Future<void> importFile()async{final r=await FilePicker.platform.pickFiles(withData:true,type:FileType.custom,allowedExtensions:['txt','pdf']);if(r==null||r.files.single.bytes==null)return;try{final f=r.files.single;final t=await smartExtractFile(f.path,f.bytes!,f.extension??'');body.text=normalize(t);if(title.text.trim().isEmpty)title.text=f.name.replaceAll(RegExp(r'\.(txt|pdf)$',caseSensitive:false),'');setState((){});}catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('שגיאה בייבוא: '+e.toString())));}}
   Future<void> save()async{if(title.text.trim().isEmpty)return;final s=widget.song??Song(id:uid(),title:title.text.trim());s.title=title.text.trim();s.artist=artist.text.trim();s.style=style.text.trim().isEmpty?'כללי':style.text.trim();s.key=key.text.trim().isEmpty?'C':key.text.trim();s.text=normalize(body.text);await widget.store.putSong(s);if(widget.song==null&&listId!=null)await widget.store.toggle(listId!,s.id);if(mounted)Navigator.pop(context);}
   @override Widget build(BuildContext c)=>Scaffold(appBar:AppBar(title:Text(widget.song==null?'שיר חדש':'עריכת שיר'),actions:[IconButton(onPressed:importFile,icon:const Icon(Icons.upload_file)),IconButton(onPressed:save,icon:const Icon(Icons.check))]),body:ListView(padding:const EdgeInsets.all(15),children:[
     TextField(controller:title,style:const TextStyle(fontSize:23,fontWeight:FontWeight.bold),decoration:const InputDecoration(hintText:'שם השיר')),
@@ -424,30 +422,19 @@ class _EditorState extends State<Editor>{
 String extractPdfSmart(List<int> bytes){
   final d=PdfDocument(inputBytes:bytes);
   try{
-    final lines=PdfTextExtractor(d).extractTextLines();
-    if(lines.isEmpty)return '';
-    final pages=<int,List<TextLine>>{};
-    for(final l in lines){pages.putIfAbsent(l.pageIndex,()=>[]).add(l);}
+    final lines=PdfTextExtractor(d).extractTextLines();if(lines.isEmpty)return '';
+    final pages=<int,List<TextLine>>{};for(final l in lines){pages.putIfAbsent(l.pageIndex,()=>[]).add(l);}
     final out=<String>[];
     for(final page in pages.keys.toList()..sort()){
       final ls=pages[page]!..sort((x,y)=>x.bounds.top.compareTo(y.bounds.top));
       for(int i=0;i<ls.length;i++){
-        final line=ls[i];
-        final words=[...line.wordCollection];
-        final heb=containsHebrew(line.text);
+        final line=ls[i],words=[...line.wordCollection],heb=containsHebrew(line.text);
         words.sort((x,y)=>heb?y.bounds.left.compareTo(x.bounds.left):x.bounds.left.compareTo(y.bounds.left));
-        final text=words.map((w)=>w.text).join(' ').trim();
-        if(text.isEmpty)continue;
+        final text=words.map((w)=>w.text).join(' ').trim();if(text.isEmpty)continue;
         if(looksLikeChordLine(text)&&i+1<ls.length){
-          final below=ls[i+1];
-          final bw=[...below.wordCollection];
-          final bheb=containsHebrew(below.text);
+          final below=ls[i+1],bw=[...below.wordCollection],bheb=containsHebrew(below.text);
           bw.sort((x,y)=>bheb?y.bounds.left.compareTo(x.bounds.left):x.bounds.left.compareTo(y.bounds.left));
-          if(bw.isNotEmpty && !looksLikeChordLine(below.text) && below.bounds.top-line.bounds.bottom < line.fontSize*3){
-            out.add(attachChords(words,bw,bheb));
-            i++;
-            continue;
-          }
+          if(bw.isNotEmpty&&!looksLikeChordLine(below.text)&&below.bounds.top-line.bounds.bottom<line.fontSize*3){out.add(attachChords(words,bw,bheb));i++;continue;}
         }
         out.add(text);
       }
@@ -457,55 +444,91 @@ String extractPdfSmart(List<int> bytes){
   }finally{d.dispose();}
 }
 bool containsHebrew(String s)=>RegExp(r'[\u0590-\u05FF]').hasMatch(s);
-bool looksLikeChordLine(String s){
-  final t=s.replaceAll(RegExp(r'[|,;]'),' ').split(RegExp(r'\s+')).where((x)=>x.isNotEmpty).toList();
-  if(t.isEmpty||t.length>16)return false;
-  return t.where(isChord).length/t.length>=.65;
+bool looksLikeChordLine(String s){final t=s.replaceAll(RegExp(r'[|,;]'),' ').split(RegExp(r'\s+')).where((x)=>x.isNotEmpty).toList();if(t.isEmpty||t.length>18)return false;return t.where((x)=>isChord(x.replaceAll(RegExp(r'x\d+$'),'')).length/t.length>=.65;}
+String attachChords(List<TextWord> chords,List<TextWord> lyrics,bool heb){final w=[...lyrics]..sort((x,y)=>heb?y.bounds.left.compareTo(x.bounds.left):x.bounds.left.compareTo(y.bounds.left));final at=<int,List<String>>{};for(final ch in chords){final x=ch.bounds.center.dx;int best=0;double dist=double.infinity;for(int i=0;i<w.length;i++){final z=w[i],d=x<z.bounds.left?z.bounds.left-x:x>z.bounds.right?x-z.bounds.right:0;if(d<dist){dist=d;best=i;}}at.putIfAbsent(best,()=>[]).add(ch.text);}final out=StringBuffer();for(int i=0;i<w.length;i++){if(i>0)out.write(' ');for(final c in at[i]??const <String>[]){out.write('[');out.write(c);out.write(']');}out.write(w[i].text);}return out.toString();}
+class OcrWord{final String text;final double left,top,right,bottom;const OcrWord(this.text,this.left,this.top,this.right,this.bottom);}
+String decodeOcrHtml(String s)=>s.replaceAll('&amp;','&').replaceAll('&lt;','<').replaceAll('&gt;','>').replaceAll('&#39;',"'").replaceAll('&quot;','"');
+List<List<OcrWord>> parseHocrLines(String hocr){
+  final rx=RegExp(r'<span[^>]*class=["\']ocrx_word["\'][^>]*title=["\'][^"\']*?bbox\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)[^"\']*["\'][^>]*>(.*?)</span>',caseSensitive:false,dotAll:true);
+  final words=<OcrWord>[];
+  for(final m in rx.allMatches(hocr)){final t=decodeOcrHtml(m.group(5)!.replaceAll(RegExp(r'<[^>]+>'),'')).trim();if(t.isNotEmpty)words.add(OcrWord(t,double.parse(m.group(1)!),double.parse(m.group(2)!),double.parse(m.group(3)!),double.parse(m.group(4)!)));}
+  words.sort((a,b)=>a.top.compareTo(b.top));
+  final lines=<List<OcrWord>>[];
+  for(final w in words){if(lines.isEmpty||(w.top-lines.last.first.top).abs()>math.max(14.0,w.bottom-w.top))lines.add([w]);else lines.last.add(w);}
+  for(final line in lines){final heb=line.any((w)=>containsHebrew(w.text));line.sort((a,b)=>heb?b.left.compareTo(a.left):a.left.compareTo(b.left));}
+  return lines;
 }
-String attachChords(List<TextWord> chords,List<TextWord> lyrics,bool heb){
-  final w=[...lyrics]..sort((x,y)=>heb?y.bounds.left.compareTo(x.bounds.left):x.bounds.left.compareTo(y.bounds.left));
-  final at=<int,List<String>>{};
-  for(final ch in chords){
-    final x=ch.bounds.center.dx;
-    int best=0;double dist=double.infinity;
-    for(int i=0;i<w.length;i++){
-      final z=w[i];
-      final double d=x<z.bounds.left?z.bounds.left-x:x>z.bounds.right?x-z.bounds.right:0;
-      if(d<dist){dist=d;best=i;}
+String hocrToChordPro(String hocr){
+  final lines=parseHocrLines(hocr),out=<String>[];
+  for(int i=0;i<lines.length;i++){
+    final line=lines[i];if(line.isEmpty)continue;
+    final raw=line.map((w)=>w.text).join(' ').trim(),h=heading(raw.replaceAll(':','').trim());
+    if(h!=null&&raw.length<30){out.add('# '+h);continue;}
+    final chords=line.where((w)=>isChord(w.text)||RegExp(r'^.+x\d+$').hasMatch(w.text)&&isChord(w.text.replaceAll(RegExp(r'x\d+$'),'')).toList();
+    final lyrics=line.where((w)=>!chords.contains(w)).toList();
+    if(chords.isNotEmpty&&lyrics.isEmpty&&i+1<lines.length){
+      final next=lines[i+1],nextChords=next.where((w)=>isChord(w.text)).toList(),nextLyrics=next.where((w)=>!isChord(w.text)).toList();
+      if(nextLyrics.isNotEmpty&&nextChords.isEmpty){out.add(attachOcrChords(chords,nextLyrics));i++;continue;}
     }
-    at.putIfAbsent(best,()=>[]).add(ch.text);
+    if(chords.isNotEmpty&&lyrics.isNotEmpty)out.add(attachOcrChords(chords,lyrics));else out.add(line.map((w)=>w.text).join(' '));
   }
-  final out=StringBuffer();
-  for(int i=0;i<w.length;i++){
-    if(i>0)out.write(' ');
-    for(final c in at[i]??const <String>[]){out.write('[');out.write(c);out.write(']');}
-    out.write(w[i].text);
+  return normalize(out.join('\n'));
+}
+String attachOcrChords(List<OcrWord> chords,List<OcrWord> lyrics){final at=<int,List<String>>{};for(final ch in chords){final x=(ch.left+ch.right)/2;int best=0;double dist=double.infinity;for(int i=0;i<lyrics.length;i++){final z=lyrics[i],d=x<z.left?z.left-x:x>z.right?x-z.right:0;if(d<dist){dist=d;best=i;}}at.putIfAbsent(best,()=>[]).add(ch.text);}final b=StringBuffer();for(int i=0;i<lyrics.length;i++){if(i>0)b.write(' ');for(final c in at[i]??const <String>[]){b.write('[');b.write(c);b.write(']');}b.write(lyrics[i].text);}return b.toString();}
+Future<void> ensureTessData()async{
+  final dir=Directory(await FlutterTesseractOcr.getTessdataPath());if(!await dir.exists())await dir.create(recursive:true);
+  for(final lang in ['heb','eng']){
+    final f=File(dir.path+'/'+lang+'.traineddata');if(await f.exists()&&await f.length()>10000)continue;
+    final client=HttpClient();try{final req=await client.getUrl(Uri.parse('https://github.com/tesseract-ocr/tessdata_fast/raw/main/'+lang+'.traineddata'));final res=await req.close();if(res.statusCode!=200)throw Exception('לא ניתן להוריד מודל OCR '+lang);final data=await consolidateHttpClientResponseBytes(res);await f.writeAsBytes(data);}finally{client.close();}
   }
-  return out.toString();
 }
-List<String> parseSongList(String raw){
-  final out=<String>[];
-  for(final line in raw.replaceAll('\r','').split('\n')){
-    var x=line.trim();
-    if(x.isEmpty)continue;
-    x=x.replaceFirst(RegExp(r'^\s*(?:\d+[.)\-:]|[-•])\s*'),'');
-    if(isChord(x)||looksLikeChordLine(x)||x.length>90)continue;
-    if(RegExp(r'^(רשימת שירים|שירים|playlist|setlist)$',caseSensitive:false).hasMatch(x))continue;
-    if(!out.contains(x))out.add(x);
-  }
-  return out;
+Future<String> ocrImageBytes(List<int> bytes,{String extension='png'})async{
+  await ensureTessData();final dir=await getTemporaryDirectory();final file=File(dir.path+'/bama_ocr_'+DateTime.now().microsecondsSinceEpoch+'.'+extension);await file.writeAsBytes(bytes,flush:true);
+  try{return hocrToChordPro(await FlutterTesseractOcr.extractHocr(file.path,language:'heb+eng',args:{'psm':'6','preserve_interword_spaces':'1'}));}finally{if(await file.exists())await file.delete();}
 }
-String baseName(String path){
-  final n=path.split(Platform.pathSeparator).last;
-  return n.replaceFirst(RegExp(r'\.(txt|pdf)$',caseSensitive:false),'');
+Future<String> ocrPdfBytes(List<int> bytes)async{
+  final dir=await getTemporaryDirectory(),pdfFile=File(dir.path+'/bama_pdf_'+DateTime.now().microsecondsSinceEpoch+'.pdf');await pdfFile.writeAsBytes(bytes,flush:true);
+  final doc=await pdf_renderer.PdfDocument.openFile(pdfFile.path),out=<String>[];
+  try{for(int pageNo=1;pageNo<=doc.pageCount;pageNo++){final page=await doc.getPage(pageNo);try{final image=await page.render(width:(page.width*2).round(),height:(page.height*2).round(),format:pdf_renderer.PdfPageImageFormat.PNG);if(image.bytes.isNotEmpty)out.add(await ocrImageBytes(image.bytes));}finally{await page.close();}}}finally{doc.dispose();if(await pdfFile.exists())await pdfFile.delete();}
+  return normalize(out.join('\n\n'));
 }
-String inferStyle(String path,List<String> styles){
-  final p=path.toLowerCase();
-  for(final s in styles){if(s!='כללי'&&p.contains(s.toLowerCase()))return s;}
-  return 'כללי';
+Future<String> smartExtractFile(String? path,List<int> bytes,String extension)async{
+  final ext=extension.toLowerCase();
+  if(ext=='txt')return normalize(utf8.decode(bytes,allowMalformed:true));
+  if(ext=='pdf'){final text=extractPdfSmart(bytes);final useful=text.trim().length>30&&(containsHebrew(text)||RegExp(r'[A-G](?:#|b)?(?:m|7|maj7)?').hasMatch(text));return useful?text:await ocrPdfBytes(bytes);}
+  if(['jpg','jpeg','png','webp','bmp'].contains(ext))return await ocrImageBytes(bytes,extension:ext=='jpg'||ext=='jpeg'?'jpg':'png');
+  throw Exception('פורמט קובץ לא נתמך');
 }
+List<String> parseSongList(String raw){final out=<String>[];for(final line in raw.replaceAll('\r','').split('\n')){var x=line.trim();if(x.isEmpty)continue;x=x.replaceFirst(RegExp(r'^\s*(?:\d+[.)\-:]|[-•])\s*'),'');if(isChord(x)||looksLikeChordLine(x)||x.length>90)continue;if(RegExp(r'^(רשימת שירים|שירים|playlist|setlist)$',caseSensitive:false).hasMatch(x))continue;if(!out.contains(x))out.add(x);}return out;}
+String baseName(String path)=>path.split(Platform.pathSeparator).last.replaceFirst(RegExp(r'\.(txt|pdf|jpg|jpeg|png|webp|bmp)$',caseSensitive:false),'');
+String inferStyle(String path,List<String> styles){final p=path.toLowerCase();for(final s in styles){if(s!='כללי'&&p.contains(s.toLowerCase()))return s;}return 'כללי';}
 
 class SmartImport extends StatefulWidget{
+  final Store store;final String mode;
+  const SmartImport({super.key,required this.store,required this.mode});
+  @override State<SmartImport> createState()=>_SmartImportState();
+}
+class _SmartImportState extends State<SmartImport>{
+  bool busy=false;String status='';
+  Future<void> scan()async{
+    final files=await FilePicker.platform.pickFiles(allowMultiple:true,withData:true,type:FileType.custom,allowedExtensions:['txt','pdf','jpg','jpeg','png','webp','bmp']);if(files==null)return;
+    setState((){busy=true;status='מפעיל סריקה חכמה...';});
+    try{
+      int count=0;
+      for(final f in files.files){if(f.bytes==null)continue;final text=await smartExtractFile(f.path,f.bytes!,f.extension??''),title=baseName(f.name);
+        if(widget.mode=='lists'){final names=parseSongList(text);if(names.isNotEmpty)widget.store.lists.add(Setlist(id:uid(),name:title,names:names));}
+        else{final existing=widget.store.songs.where((x)=>x.title.trim()==title.trim()).cast<Song?>().firstOrNull;if(existing==null)widget.store.songs.add(Song(id:uid(),title:title,style:inferStyle(f.name,widget.store.styles),text:text));else if(existing.text.trim().isEmpty)existing.text=text;}
+        count++;if(mounted)setState(()=>status='טופל: '+count.toString()+' / '+files.files.length.toString());
+      }
+      await widget.store.save();if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('הסריקה הסתיימה: '+count.toString()+' קבצים')));
+    }catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('שגיאה בסריקה: '+e.toString())));}
+    finally{if(mounted)setState(()=>busy=false);}
+  }
+  @override Widget build(BuildContext c)=>Scaffold(appBar:AppBar(title:Text(widget.mode=='lists'?'סריקת רשימות':'סריקה חכמה')),body:Center(child:Padding(padding:const EdgeInsets.all(24),child:Column(mainAxisSize:MainAxisSize.min,children:[
+    const LogoMark(size:82),const SizedBox(height:18),Text(widget.mode=='lists'?'סריקת רשימות שירים':'סריקה חכמה של שירים',style:const TextStyle(fontSize:22,fontWeight:FontWeight.w900),textAlign:TextAlign.center),const SizedBox(height:8),const Text('PDF • TXT • תמונות\nזיהוי OCR, אקורדים, מילים ומבנה שיר',style:TextStyle(color:soft),textAlign:TextAlign.center),const SizedBox(height:22),if(busy)const CircularProgressIndicator() else FilledButton.icon(onPressed:scan,icon:const Icon(Icons.document_scanner_outlined),label:const Text('בחר קבצים')),if(status.isNotEmpty)Padding(padding:const EdgeInsets.only(top:16),child:Text(status,style:const TextStyle(color:soft)))
+  ]))));
+}
+class SettingsPageclass SmartImport extends StatefulWidget{
   final Store store;final String mode;
   const SmartImport({super.key,required this.store,required this.mode});
   @override State<SmartImport> createState()=>_SmartImportState();
