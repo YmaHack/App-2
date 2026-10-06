@@ -22,17 +22,16 @@ class App extends StatelessWidget {
   const App({super.key,required this.store});
   @override Widget build(BuildContext c)=>MaterialApp(
     debugShowCheckedModeBanner:false,title:'במה',
-    home:AnimatedBuilder(animation:store,builder:(_,__)=>Directionality(textDirection:TextDirection.rtl,child:Home(store:store))),
     theme:appTheme(store.theme),
     home:AnimatedBuilder(animation:store,builder:(_,__)=>Directionality(textDirection:TextDirection.rtl,child:Home(store:store))),
   );
 }
 
 class Song {
-  String id,title,artist,style,key,text;
-  Song({required this.id,required this.title,this.artist='',this.style='כללי',this.key='C',this.text=''});
-  Map<String,dynamic> toJson()=>{'id':id,'title':title,'artist':artist,'style':style,'key':key,'text':text};
-  factory Song.fromJson(Map<String,dynamic> j)=>Song(id:j['id']??uid(),title:j['title']??'שיר',artist:j['artist']??'',style:j['style']??'כללי',key:j['key']??'C',text:j['text']??'');
+  String id,title,artist,style,key,text,folderId;
+  Song({required this.id,required this.title,this.artist='',this.style='כללי',this.key='C',this.text='',this.folderId=''});
+  Map<String,dynamic> toJson()=>{'id':id,'title':title,'artist':artist,'style':style,'key':key,'text':text,'folderId':folderId};
+  factory Song.fromJson(Map<String,dynamic> j)=>Song(id:j['id']??uid(),title:j['title']??'שיר',artist:j['artist']??'',style:j['style']??'כללי',key:j['key']??'C',text:j['text']??'',folderId:j['folderId']??'');
 }
 class Setlist {
   String id,name,folderId; List<String> ids,names;
@@ -135,70 +134,74 @@ class Dashboard extends StatelessWidget{
 }
 class Lists extends StatelessWidget{
   final Store store; const Lists({super.key,required this.store});
-  Future<void> importListFile(BuildContext c)async{final r=await FilePicker.platform.pickFiles(withData:true,type:FileType.custom,allowedExtensions:['txt','pdf']);if(r==null||r.files.single.bytes==null)return;try{final f=r.files.single;final raw=f.extension?.toLowerCase()=='pdf'?extractPdfSmart(f.bytes!):utf8.decode(f.bytes!,allowMalformed:true);final names=parseSongList(raw);if(names.isEmpty)throw Exception('לא נמצאו שמות שירים');await store.addList(baseName(f.name));final l=store.lists.last;for(final n in names){final e=store.songs.where((x)=>x.title.trim()==n.trim()).cast<Song?>().firstOrNull;final song=e??Song(id:uid(),title:n);if(e==null)store.songs.add(song);l.ids.add(song.id);}await store.save();if(c.mounted)ScaffoldMessenger.of(c).showSnackBar(SnackBar(content:Text('${names.length} שירים נוספו לרשימה')));}catch(e){if(c.mounted)ScaffoldMessenger.of(c).showSnackBar(SnackBar(content:Text('שגיאה בייבוא: $e')));}}
-  Future<void> add(BuildContext c)async{final t=TextEditingController();final n=await showDialog<String>(context:c,builder:(_)=>AlertDialog(title:const Text('רשימת הופעה חדשה'),content:TextField(controller:t,autofocus:true,decoration:const InputDecoration(hintText:'שם ההופעה')),actions:[TextButton(onPressed:()=>Navigator.pop(c),child:const Text('ביטול')),FilledButton(onPressed:()=>Navigator.pop(c,t.text.trim()),child:const Text('צור'))]));if(n!=null&&n.isNotEmpty)await store.addList(n);}
-  @override Widget build(BuildContext c)=>Scaffold(
-    appBar:AppBar(title:const Text('רשימות שירים',style:TextStyle(fontWeight:FontWeight.w900)),actions:[IconButton(onPressed:()=>importListFile(c),icon:const Icon(Icons.upload_file)),IconButton.filledTonal(onPressed:()=>add(c),icon:const Icon(Icons.add))]),
-    body:ListView(padding:const EdgeInsets.all(16),children:[
-      const Text('רשימות ההופעה שלך',style:TextStyle(fontSize:25,fontWeight:FontWeight.w800)),
-      const SizedBox(height:5),const Text('חלק כל רשימה לפי סגנון ועבור ביניהם במהירות.',style:TextStyle(color:soft)),const SizedBox(height:18),
-      ...store.lists.map((l)=>ListCard(store:store,list:l)),
-    ]),
-  );
-}
-
-class ListCard extends StatelessWidget{
-  final Store store; final Setlist list;
-  const ListCard({super.key,required this.store,required this.list});
-  Future<void> act(BuildContext c)async{
-    final a=await showModalBottomSheet<String>(context:c,builder:(_)=>SafeArea(child:Column(mainAxisSize:MainAxisSize.min,children:[
-      ListTile(leading:const Icon(Icons.edit),title:const Text('עריכת שם'),onTap:()=>Navigator.pop(c,'edit')),
-      ListTile(leading:const Icon(Icons.delete_outline,color:Colors.redAccent),title:const Text('מחיקה'),onTap:()=>Navigator.pop(c,'delete')),
-    ])));
-    if(a=='edit'){final t=TextEditingController(text:list.name);final n=await showDialog<String>(context:c,builder:(_)=>AlertDialog(title:const Text('עריכת רשימה'),content:TextField(controller:t),actions:[TextButton(onPressed:()=>Navigator.pop(c),child:const Text('ביטול')),FilledButton(onPressed:()=>Navigator.pop(c,t.text.trim()),child:const Text('שמור'))]));if(n!=null&&n.isNotEmpty)await store.renameList(list,n);}
-    if(a=='delete'&&c.mounted&&await confirmDelete(c,'למחוק את הרשימה?'))await store.deleteList(list);
+  Future<void> importPlaylist(BuildContext c)async{
+    final r=await FilePicker.platform.pickFiles(withData:true,type:FileType.custom,allowedExtensions:['txt','pdf']);
+    if(r==null||r.files.single.bytes==null)return;
+    try{
+      final f=r.files.single;
+      final raw=f.extension?.toLowerCase()=='pdf'?extractPdfSmart(f.bytes!):utf8.decode(f.bytes!,allowMalformed:true);
+      final names=parseSongList(raw);
+      if(names.isEmpty)throw Exception('לא נמצאו שמות שירים');
+      store.lists.add(Setlist(id:uid(),name:baseName(f.name),names:names));await store.save();
+      if(c.mounted)ScaffoldMessenger.of(c).showSnackBar(SnackBar(content:Text(names.length.toString()+' שירים נוספו לפלייליסט')));
+    }catch(e){if(c.mounted)ScaffoldMessenger.of(c).showSnackBar(SnackBar(content:Text('שגיאה בייבוא: '+e.toString())));}
   }
-  @override Widget build(BuildContext c)=>Card(child:InkWell(onTap:()=>Navigator.push(c,MaterialPageRoute(builder:(_)=>SetlistView(store:store,list:list))),onLongPress:()=>act(c),child:Padding(padding:const EdgeInsets.all(15),child:Row(children:[
-    const CircleAvatar(backgroundColor:Color(0x223F51B5),child:Icon(Icons.list_alt,color:accent)),const SizedBox(width:13),
-    Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text(list.name,style:const TextStyle(fontWeight:FontWeight.w800,fontSize:17)),const SizedBox(height:4),Text('${list.ids.length} שירים • לחיצה ארוכה לעריכה/מחיקה',style:const TextStyle(color:soft,fontSize:12))])),
-    const Icon(Icons.chevron_left,color:soft),
-  ]))));
-}
-
-class SetlistView extends StatefulWidget{
-  final Store store; final Setlist list;
-  const SetlistView({super.key,required this.store,required this.list});
-  @override State<SetlistView> createState()=>_SetlistViewState();
-}
-class _SetlistViewState extends State<SetlistView>{
-  String style='הכל';
+  Future<void> addPlaylist(BuildContext c)async{
+    final t=TextEditingController();
+    final n=await showDialog<String>(context:c,builder:(_)=>AlertDialog(title:const Text('פלייליסט חדש'),content:TextField(controller:t,autofocus:true,decoration:const InputDecoration(hintText:'שם הפלייליסט')),actions:[TextButton(onPressed:()=>Navigator.pop(c),child:const Text('ביטול')),FilledButton(onPressed:()=>Navigator.pop(c,t.text.trim()),child:const Text('צור'))]));
+    if(n!=null&&n.isNotEmpty)await store.addPlaylist(n);
+  }
+  Future<void> addFolder(BuildContext c)async{
+    final t=TextEditingController();
+    final n=await showDialog<String>(context:c,builder:(_)=>AlertDialog(title:const Text('תיקייה חדשה'),content:TextField(controller:t,autofocus:true),actions:[TextButton(onPressed:()=>Navigator.pop(c),child:const Text('ביטול')),FilledButton(onPressed:()=>Navigator.pop(c,t.text.trim()),child:const Text('צור'))]));
+    if(n!=null&&n.isNotEmpty)await store.addFolder(n);
+  }
   @override Widget build(BuildContext c){
-    final all=widget.list.ids.map(widget.store.song).whereType<Song>().toList();
-    final styles=['הכל',...all.map((x)=>x.style).toSet()];
-    final shown=all.where((x)=>style=='הכל'||x.style==style).toList();
-    return Scaffold(
-      appBar:AppBar(title:Text(widget.list.name),actions:[
-        IconButton(onPressed:()=>showModalBottomSheet(context:c,isScrollControlled:true,builder:(_)=>AddSongs(store:widget.store,list:widget.list)),icon:const Icon(Icons.playlist_add))
-      ]),
-      floatingActionButton:FloatingActionButton.extended(
-        onPressed:()=>showModalBottomSheet(context:c,isScrollControlled:true,builder:(_)=>AddSongs(store:widget.store,list:widget.list)),
-        icon:const Icon(Icons.add),label:const Text('הוסף')),
-      body:Column(children:[
-        SizedBox(height:60,child:ListView.separated(
-          scrollDirection:Axis.horizontal,padding:const EdgeInsets.symmetric(horizontal:14,vertical:9),
-          itemCount:styles.length,separatorBuilder:(_,__)=>const SizedBox(width:7),
-          itemBuilder:(_,i)=>ChoiceChip(label:Text(styles[i]),selected:style==styles[i],onSelected:(_)=>setState(()=>style=styles[i]))
-        )),
-        Expanded(child:ListView.separated(
-          padding:const EdgeInsets.fromLTRB(14,5,14,90),itemCount:shown.length,separatorBuilder:(_,__)=>const SizedBox(height:9),
-          itemBuilder:(_,i){
-            final song=shown[i];
-            return LongSongTile(store:widget.store,song:song);
-          }
-        ))
-      ])
-    );
+    final rootFolders=store.folders.where((f)=>f.parentId.isEmpty).toList();
+    final rootLists=store.lists.where((p)=>p.folderId.isEmpty).toList();
+    return Scaffold(appBar:AppBar(title:const Text('פלייליסטים',style:TextStyle(fontWeight:FontWeight.w900)),actions:[IconButton(onPressed:()=>addFolder(c),tooltip:'תיקייה',icon:const Icon(Icons.create_new_folder_outlined)),IconButton(onPressed:()=>importPlaylist(c),tooltip:'ייבוא',icon:const Icon(Icons.upload_file)),IconButton.filledTonal(onPressed:()=>addPlaylist(c),tooltip:'פלייליסט חדש',icon:const Icon(Icons.add))]),body:ListView(padding:const EdgeInsets.all(16),children:[
+      const Text('פלייליסטים',style:TextStyle(fontSize:26,fontWeight:FontWeight.w900)),const SizedBox(height:5),const Text('רק שמות השירים — בלי צורך להוסיף אותם לספריית השירים.',style:TextStyle(color:soft)),const SizedBox(height:16),
+      ...rootFolders.map((f)=>FolderCard(store:store,folder:f)),...rootLists.map((p)=>PlaylistCard(store:store,playlist:p)),
+      if(rootFolders.isEmpty&&rootLists.isEmpty)const Padding(padding:EdgeInsets.all(35),child:Center(child:Text('עדיין אין פלייליסטים. לחץ + כדי ליצור אחד.'))),
+    ]));
   }
+}
+class FolderCard extends StatelessWidget{
+  final Store store;final Folder folder;const FolderCard({super.key,required this.store,required this.folder});
+  Future<void> act(BuildContext c)async{
+    final a=await showModalBottomSheet<String>(context:c,builder:(_)=>SafeArea(child:Column(mainAxisSize:MainAxisSize.min,children:[ListTile(leading:const Icon(Icons.edit),title:const Text('עריכה'),onTap:()=>Navigator.pop(c,'edit')),ListTile(leading:const Icon(Icons.swap_vert),title:const Text('שינוי מיקום'),onTap:()=>Navigator.pop(c,'move')),ListTile(leading:const Icon(Icons.delete_outline,color:Colors.redAccent),title:const Text('מחיקה'),onTap:()=>Navigator.pop(c,'delete'))])));
+    if(a=='edit'&&c.mounted){final t=TextEditingController(text:folder.name);final n=await showDialog<String>(context:c,builder:(_)=>AlertDialog(title:const Text('עריכת תיקייה'),content:TextField(controller:t),actions:[TextButton(onPressed:()=>Navigator.pop(c),child:const Text('ביטול')),FilledButton(onPressed:()=>Navigator.pop(c,t.text.trim()),child:const Text('שמור'))]));if(n!=null&&n.isNotEmpty)await store.renameFolder(folder,n);}
+    if(a=='move'&&c.mounted){final id=await chooseFolder(c,store,exclude:folder.id);if(id!=null){folder.parentId=id;await store.save();}}
+    if(a=='delete'&&c.mounted&&await confirmDelete(c,'למחוק את התיקייה? הפלייליסטים שבתוכה יעברו החוצה.'))await store.deleteFolder(folder);
+  }
+  @override Widget build(BuildContext c)=>Card(child:InkWell(onTap:()=>Navigator.push(c,MaterialPageRoute(builder:(_)=>FolderView(store:store,folder:folder))),onLongPress:()=>act(c),child:ListTile(leading:const Icon(Icons.folder_rounded,color:accent),title:Text(folder.name,style:const TextStyle(fontWeight:FontWeight.w800)),subtitle:const Text('לחיצה ארוכה: עריכה • מחיקה • שינוי מיקום'),trailing:const Icon(Icons.chevron_left))));
+}
+class PlaylistCard extends StatelessWidget{
+  final Store store;final Setlist playlist;const PlaylistCard({super.key,required this.store,required this.playlist});
+  Future<void> act(BuildContext c)async{
+    final a=await showModalBottomSheet<String>(context:c,builder:(_)=>SafeArea(child:Column(mainAxisSize:MainAxisSize.min,children:[ListTile(leading:const Icon(Icons.edit),title:const Text('עריכה'),onTap:()=>Navigator.pop(c,'edit')),ListTile(leading:const Icon(Icons.swap_vert),title:const Text('שינוי מיקום'),onTap:()=>Navigator.pop(c,'move')),ListTile(leading:const Icon(Icons.delete_outline,color:Colors.redAccent),title:const Text('מחיקה'),onTap:()=>Navigator.pop(c,'delete'))])));
+    if(a=='edit'&&c.mounted){final t=TextEditingController(text:playlist.name);final n=await showDialog<String>(context:c,builder:(_)=>AlertDialog(title:const Text('עריכת פלייליסט'),content:TextField(controller:t),actions:[TextButton(onPressed:()=>Navigator.pop(c),child:const Text('ביטול')),FilledButton(onPressed:()=>Navigator.pop(c,t.text.trim()),child:const Text('שמור'))]));if(n!=null&&n.isNotEmpty)await store.renamePlaylist(playlist,n);}
+    if(a=='move'&&c.mounted){final id=await chooseFolder(c,store);if(id!=null)await store.movePlaylist(playlist,id);}
+    if(a=='delete'&&c.mounted&&await confirmDelete(c,'למחוק את הפלייליסט?'))await store.deleteList(playlist);
+  }
+  @override Widget build(BuildContext c)=>Card(child:InkWell(onTap:()=>Navigator.push(c,MaterialPageRoute(builder:(_)=>PlaylistView(store:store,playlist:playlist))),onLongPress:()=>act(c),child:ListTile(leading:const Icon(Icons.queue_music_rounded,color:accent),title:Text(playlist.name,style:const TextStyle(fontWeight:FontWeight.w800)),subtitle:Text(playlist.names.length.toString()+' שירים • לחיצה ארוכה לניהול'),trailing:const Icon(Icons.chevron_left))));
+}
+class FolderView extends StatelessWidget{
+  final Store store;final Folder folder;const FolderView({super.key,required this.store,required this.folder});
+  @override Widget build(BuildContext c){final folders=store.folders.where((x)=>x.parentId==folder.id).toList();final lists=store.lists.where((x)=>x.folderId==folder.id).toList();return Scaffold(appBar:AppBar(title:Text(folder.name)),body:ListView(padding:const EdgeInsets.all(15),children:[...folders.map((f)=>FolderCard(store:store,folder:f)),...lists.map((p)=>PlaylistCard(store:store,playlist:p))]));}
+}
+class PlaylistView extends StatefulWidget{
+  final Store store;final Setlist playlist;const PlaylistView({super.key,required this.store,required this.playlist});
+  @override State<PlaylistView> createState()=>_PlaylistViewState();
+}
+class _PlaylistViewState extends State<PlaylistView>{
+  @override Widget build(BuildContext c)=>Scaffold(appBar:AppBar(title:Text(widget.playlist.name),actions:[IconButton(onPressed:()=>addName(c),icon:const Icon(Icons.add))]),body:widget.playlist.names.isEmpty?const Center(child:Text('הפלייליסט ריק. לחץ + כדי להוסיף שם שיר.')):ReorderableListView.builder(padding:const EdgeInsets.all(14),itemCount:widget.playlist.names.length,onReorder:(a,b)async{await widget.store.reorderPlaylistNames(widget.playlist,a,b);setState((){});},itemBuilder:(_,i)=>ListTile(key:ValueKey(widget.playlist.names[i]+'-'+i.toString()),leading:CircleAvatar(radius:14,child:Text((i+1).toString())),title:Text(widget.playlist.names[i],style:const TextStyle(fontSize:17,fontWeight:FontWeight.w700)),trailing:const Icon(Icons.drag_handle),onLongPress:()=>nameActions(c,i)));
+  Future<void> addName(BuildContext c)async{final t=TextEditingController();final n=await showDialog<String>(context:c,builder:(_)=>AlertDialog(title:const Text('הוסף שיר לפלייליסט'),content:TextField(controller:t,autofocus:true),actions:[TextButton(onPressed:()=>Navigator.pop(c),child:const Text('ביטול')),FilledButton(onPressed:()=>Navigator.pop(c,t.text.trim()),child:const Text('הוסף'))]));if(n!=null&&n.isNotEmpty){widget.playlist.names=[...widget.playlist.names,n];await widget.store.save();setState((){});}}
+  Future<void> nameActions(BuildContext c,int i)async{final a=await showModalBottomSheet<String>(context:c,builder:(_)=>SafeArea(child:Column(mainAxisSize:MainAxisSize.min,children:[ListTile(leading:const Icon(Icons.edit),title:const Text('עריכת שם'),onTap:()=>Navigator.pop(c,'edit')),ListTile(leading:const Icon(Icons.swap_vert),title:const Text('שינוי מיקום'),onTap:()=>Navigator.pop(c,'move')),ListTile(leading:const Icon(Icons.delete_outline,color:Colors.redAccent),title:const Text('מחיקה'),onTap:()=>Navigator.pop(c,'delete'))])));if(a=='edit'&&c.mounted){final t=TextEditingController(text:widget.playlist.names[i]);final n=await showDialog<String>(context:c,builder:(_)=>AlertDialog(title:const Text('עריכת שם שיר'),content:TextField(controller:t),actions:[TextButton(onPressed:()=>Navigator.pop(c),child:const Text('ביטול')),FilledButton(onPressed:()=>Navigator.pop(c,t.text.trim()),child:const Text('שמור'))]));if(n!=null&&n.isNotEmpty){final a2=List<String>.from(widget.playlist.names);a2[i]=n;widget.playlist.names=a2;await widget.store.save();setState((){});}}if(a=='delete'){await widget.store.removePlaylistName(widget.playlist,i);setState((){});}if(a=='move'&&c.mounted)ScaffoldMessenger.of(c).showSnackBar(const SnackBar(content:Text('גרור את השיר למיקום הרצוי')));}
+}
+Future<String?> chooseFolder(BuildContext c,Store store,{String exclude=''})async{
+  final v=await showModalBottomSheet<String>(context:c,builder:(_)=>SafeArea(child:ListView(children:[const ListTile(title:Text('בחר תיקייה')),ListTile(leading:const Icon(Icons.home_outlined),title:const Text('ללא תיקייה'),onTap:()=>Navigator.pop(c,'')),...store.folders.where((f)=>f.id!=exclude).map((f)=>ListTile(leading:const Icon(Icons.folder_outlined),title:Text(f.name),onTap:()=>Navigator.pop(c,f.id)))])));
+  return v;
 }
 
 class AddSongs extends StatefulWidget{
