@@ -20,10 +20,13 @@ void main() async { WidgetsFlutterBinding.ensureInitialized(); final s=Store(); 
 class App extends StatelessWidget {
   final Store store;
   const App({super.key,required this.store});
-  @override Widget build(BuildContext c)=>MaterialApp(
-    debugShowCheckedModeBanner:false,title:'במה',
-    theme:appTheme(store.theme),
-    home:AnimatedBuilder(animation:store,builder:(_,__)=>Directionality(textDirection:TextDirection.rtl,child:Home(store:store))),
+  @override Widget build(BuildContext c)=>AnimatedBuilder(
+    animation:store,
+    builder:(_,__)=>MaterialApp(
+      debugShowCheckedModeBanner:false,title:'במה',
+      theme:appTheme(store.theme),
+      home:Directionality(textDirection:TextDirection.rtl,child:Home(store:store)),
+    ),
   );
 }
 
