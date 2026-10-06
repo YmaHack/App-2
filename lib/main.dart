@@ -242,7 +242,7 @@ class _PlaylistViewState extends State<PlaylistView>{
   }
 }
 Future<int?> choosePosition(BuildContext c,int current,int count)async=>showModalBottomSheet<int>(context:c,builder:(_)=>SafeArea(child:ListView.builder(shrinkWrap:true,itemCount:count,itemBuilder:(_,i)=>ListTile(leading:Icon(i==current?Icons.radio_button_checked:Icons.radio_button_unchecked),title:Text('מיקום '+(i+1).toString()),onTap:()=>Navigator.pop(c,i)))));
-Future<String?> chooseFolderFuture<String?> chooseFolder(BuildContext c,Store store,{String exclude=''})async{
+Future<String?> chooseFolder(BuildContext c,Store store,{String exclude=''})async{
   final v=await showModalBottomSheet<String>(context:c,builder:(_)=>SafeArea(child:ListView(children:[const ListTile(title:Text('בחר תיקייה')),ListTile(leading:const Icon(Icons.home_outlined),title:const Text('ללא תיקייה'),onTap:()=>Navigator.pop(c,'')),...store.folders.where((f)=>f.id!=exclude).map((f)=>ListTile(leading:const Icon(Icons.folder_outlined),title:Text(f.name),onTap:()=>Navigator.pop(c,f.id)))])));
   return v;
 }
@@ -305,7 +305,7 @@ class SongTile extends StatelessWidget{
     const SizedBox(width:12),Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text(song.title,style:const TextStyle(fontWeight:FontWeight.bold,fontSize:16)),const SizedBox(height:4),Text(song.style+' • '+(song.artist.isEmpty?'ללא אמן':song.artist),style:const TextStyle(color:soft,fontSize:12))])),Text(song.key,style:const TextStyle(color:chord,fontWeight:FontWeight.w800))
   ]))));
 }
-class Player extends StatefulWidget{class Player extends StatefulWidget{
+class Player extends StatefulWidget{
   final Store store; final Song song;
   const Player({super.key,required this.store,required this.song});
   @override State<Player> createState()=>_PlayerState();
@@ -528,66 +528,6 @@ class _SmartImportState extends State<SmartImport>{
     const LogoMark(size:82),const SizedBox(height:18),Text(widget.mode=='lists'?'סריקת רשימות שירים':'סריקה חכמה של שירים',style:const TextStyle(fontSize:22,fontWeight:FontWeight.w900),textAlign:TextAlign.center),const SizedBox(height:8),const Text('PDF • TXT • תמונות\nזיהוי OCR, אקורדים, מילים ומבנה שיר',style:TextStyle(color:soft),textAlign:TextAlign.center),const SizedBox(height:22),if(busy)const CircularProgressIndicator() else FilledButton.icon(onPressed:scan,icon:const Icon(Icons.document_scanner_outlined),label:const Text('בחר קבצים')),if(status.isNotEmpty)Padding(padding:const EdgeInsets.only(top:16),child:Text(status,style:const TextStyle(color:soft)))
   ]))));
 }
-class SettingsPageclass SmartImport extends StatefulWidget{
-  final Store store;final String mode;
-  const SmartImport({super.key,required this.store,required this.mode});
-  @override State<SmartImport> createState()=>_SmartImportState();
-}
-class _SmartImportState extends State<SmartImport>{
-  bool busy=false;String status='';
-  Future<void> scan()async{
-    final path=await FilePicker.platform.getDirectoryPath();
-    if(path==null)return;
-    setState((){busy=true;status='סורק תיקייה...';});
-    try{
-      final files=await Directory(path).list(recursive:true,followLinks:false)
-        .where((e)=>e is File).cast<File>()
-        .where((f){final p=f.path.toLowerCase();return p.endsWith('.txt')||p.endsWith('.pdf');}).toList();
-      int count=0;
-      for(final f in files){
-        final bytes=await f.readAsBytes();
-        final title=baseName(f.path);
-        final text=f.path.toLowerCase().endsWith('.pdf')?extractPdfSmart(bytes):utf8.decode(bytes,allowMalformed:true);
-        if(widget.mode=='lists'){
-          final names=parseSongList(text);
-          if(names.isEmpty)continue;
-          final list=Setlist(id:uid(),name:title);
-          widget.store.lists.add(list);
-          for(final n in names){
-            final existing=widget.store.songs.where((x)=>x.title.trim()==n.trim()).cast<Song?>().firstOrNull;
-            final song=existing??Song(id:uid(),title:n,style:inferStyle(f.path,widget.store.styles));
-            if(existing==null)widget.store.songs.add(song);
-            list.ids.add(song.id);
-          }
-        }else{
-          final existing=widget.store.songs.where((x)=>x.title.trim()==title.trim()).cast<Song?>().firstOrNull;
-          if(existing==null){
-            widget.store.songs.add(Song(id:uid(),title:title,style:inferStyle(f.path,widget.store.styles),text:normalize(text)));
-          }
-        }
-        count++;
-        if(mounted)setState(()=>status='טופל: '+count.toString()+' / '+files.length.toString());
-      }
-      await widget.store.save();
-      if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('הסריקה הסתיימה: '+count.toString()+' קבצים')));
-    }catch(e){
-      if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('שגיאה בסריקה: '+e.toString())));
-    }finally{if(mounted)setState(()=>busy=false);}
-  }
-  @override Widget build(BuildContext c)=>Scaffold(
-    appBar:AppBar(title:Text(widget.mode=='lists'?'סריקת רשימות':'סריקת תיקיית שירים')),
-    body:Center(child:Padding(padding:const EdgeInsets.all(24),child:Column(mainAxisSize:MainAxisSize.min,children:[
-      const LogoMark(size:72),const SizedBox(height:18),
-      Text(widget.mode=='lists'?'סריקה חכמה של רשימות שירים':'סריקה חכמה של תיקיית שירים',style:const TextStyle(fontSize:22,fontWeight:FontWeight.w900),textAlign:TextAlign.center),
-      const SizedBox(height:8),
-      const Text('TXT ו-PDF, כולל תיקיות משנה.',style:TextStyle(color:soft),textAlign:TextAlign.center),
-      const SizedBox(height:22),
-      if(busy)const CircularProgressIndicator() else FilledButton.icon(onPressed:scan,icon:const Icon(Icons.folder_open),label:const Text('בחר תיקייה')),
-      if(status.isNotEmpty)Padding(padding:const EdgeInsets.only(top:16),child:Text(status,style:const TextStyle(color:soft))),
-    ]))),
-  );
-}
-
 class SettingsPage extends StatelessWidget{
   final Store store;const SettingsPage({super.key,required this.store});
   @override Widget build(BuildContext c)=>Scaffold(appBar:AppBar(title:const Text('הגדרות',style:TextStyle(fontWeight:FontWeight.w900))),body:ListView(padding:const EdgeInsets.all(15),children:[
