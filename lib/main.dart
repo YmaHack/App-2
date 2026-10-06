@@ -203,7 +203,7 @@ class _EditorState extends State<Editor>{
     body:ListView(padding:const EdgeInsets.all(16),children:[
       TextField(controller:title,decoration:const InputDecoration(labelText:'שם השיר')),
       const SizedBox(height:10),
-      DropdownButtonFormField<String>(value:folder,decoration:const InputDecoration(labelText:'תיקייה'),items:widget.store.folders.map((f)=>DropdownMenuItem(value:f.id,child:Text(f.name))).toList(),onChanged:(v)=>setState(()=>folder=v!)),
+      DropdownButtonFormField<String>(initialValue:folder,decoration:const InputDecoration(labelText:'תיקייה'),items:widget.store.folders.map((f)=>DropdownMenuItem(value:f.id,child:Text(f.name))).toList(),onChanged:(v)=>setState(()=>folder=v!)),
       const SizedBox(height:10),
       TextField(controller:key,decoration:const InputDecoration(labelText:'סולם מקורי',hintText:'C / Am / F#')),
       const SizedBox(height:14),
