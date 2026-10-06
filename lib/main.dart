@@ -276,7 +276,7 @@ class SongMap extends StatelessWidget{
   final List<Section> sections; final int active; final ValueChanged<int> onTap;
   const SongMap({super.key,required this.sections,required this.active,required this.onTap});
   @override Widget build(BuildContext c)=>SizedBox(height:42,child:Padding(padding:const EdgeInsets.symmetric(horizontal:10),child:Row(children:List.generate(sections.length,(i){
-    final s=sections[i];return Expanded(flex:math.max(1,s.lines.length),child:Padding(padding:const EdgeInsets.symmetric(horizontal:1),child:InkWell(onTap:()=>onTap(i),child:Container(decoration:BoxDecoration(color:sectionColor(s.type).withValues(alpha:i==active?.95:.24),borderRadius:BorderRadius.circular(7),border:i==active?Border.all(color:Colors.white,width:1.2):null),alignment:Alignment.center,child:Text(s.name,maxLines:1,overflow:TextOverflow.ellipsis,style:const TextStyle(fontSize:11,fontWeight:FontWeight.bold))))));
+    final s=sections[i];return Expanded(flex:math.max(1,s.lines.length),child:Padding(padding:const EdgeInsets.symmetric(horizontal:1),child:InkWell(onTap:()=>onTap(i),child:Container(decoration:BoxDecoration(color:sectionColor(s.type).withValues(alpha:i==active ? .95 : .24),borderRadius:BorderRadius.circular(7),border:i==active?Border.all(color:Colors.white,width:1.2):null),alignment:Alignment.center,child:Text(s.name,maxLines:1,overflow:TextOverflow.ellipsis,style:const TextStyle(fontSize:11,fontWeight:FontWeight.bold))))));
   }))));
 }
 
