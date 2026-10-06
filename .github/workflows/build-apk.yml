@@ -13,6 +13,7 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
+          flutter-version: 3.35.7
           cache: true
       - name: Generate Android project
         run: flutter create --no-pub --platforms=android --project-name=bama --org=com.ymahack .
@@ -34,6 +35,10 @@ jobs:
               s=s.replace('>', '>\\n    '+perm, 1)
           p.write_text(s)
           PY
+      - name: Prepare Hebrew OCR model
+        run: |
+          mkdir -p assets/tessdata
+          curl -L --fail --retry 3 https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/main/heb.traineddata -o assets/tessdata/heb.traineddata
       - name: Get packages
         run: flutter pub get
       - name: Patch OCR plugin for current Gradle
