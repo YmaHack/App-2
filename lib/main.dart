@@ -5,6 +5,7 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:syncfusion_flutter_pdf/pdf.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -529,8 +530,27 @@ String smartStructure(String input){
   for(final line in lines){if(line.isEmpty&&cleaned.isNotEmpty&&cleaned.last.isEmpty)continue;cleaned.add(line);}
   return normalize(cleaned.join('\n'));
 }
+Future<String> _ensureTessData()async{
+  final base=await getApplicationDocumentsDirectory();
+  final dir=Directory('\${base.path}/bama_tessdata');
+  if(!await dir.exists())await dir.create(recursive:true);
+  final client=HttpClient();
+  try{
+    for(final lang in ['heb','eng']){
+      final file=File('\${dir.path}/\${lang}.traineddata');
+      if(await file.exists()&&await file.length()>10000)continue;
+      final req=await client.getUrl(Uri.parse('https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/main/\${lang}.traineddata'));
+      final res=await req.close();
+      if(res.statusCode!=200)throw Exception('לא ניתן להוריד מודל OCR '+lang);
+      final data=await consolidateHttpClientResponseBytes(res);
+      await file.writeAsBytes(data,flush:true);
+    }
+  }finally{client.close();}
+  return dir.path;
+}
 Future<String> _ocrImageFile(File file)async{
-  final cfg=OCRConfig(language:'heb',engine:OCREngine.tesseract,options:{'preserve_interword_spaces':'1','tessedit_pageseg_mode':'6'});
+  final tessDataPath=await _ensureTessData();
+  final cfg=OCRConfig(language:'heb+eng',engine:OCREngine.tesseract,tessDataPath:tessDataPath,options:{'preserve_interword_spaces':'1','tessedit_pageseg_mode':'6'});
   return smartStructure(normalize(await TesseractOcr.extractText(file.path,config:cfg)));
 }
 Future<String> _ocrImageBytes(List<int> bytes,String extension)async{
