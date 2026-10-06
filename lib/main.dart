@@ -394,7 +394,7 @@ String extractPdfSmart(List<int> bytes){
           final bw=[...below.wordCollection];
           final bheb=containsHebrew(below.text);
           bw.sort((x,y)=>bheb?y.bounds.left.compareTo(x.bounds.left):x.bounds.left.compareTo(y.bounds.left));
-          if(bw.isNotEmpty && below.bounds.top-line.bounds.bottom < line.fontSize*3){
+          if(bw.isNotEmpty && !looksLikeChordLine(below.text) && below.bounds.top-line.bounds.bottom < line.fontSize*3){
             out.add(attachChords(words,bw,bheb));
             i++;
             continue;
