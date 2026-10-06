@@ -1,0 +1,31 @@
+name: Build APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Generate Android project
+        run: flutter create --no-pub --platforms=android --project-name=bama --org=com.ymahack .
+      - name: Remove generated sample tests
+        run: rm -rf test
+      - name: Get packages
+        run: flutter pub get
+      - name: Analyze
+        run: flutter analyze --no-fatal-infos
+      - name: Build release APK
+        run: flutter build apk --release
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: bama-release
+          path: build/app/outputs/flutter-apk/app-release.apk
