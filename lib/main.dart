@@ -94,7 +94,7 @@ class LogoMark extends StatelessWidget{
   const LogoMark({super.key,this.size=52});
   @override Widget build(BuildContext c)=>SizedBox(width:size,height:size,child:SvgPicture.asset('assets/logo.svg',semanticsLabel:'במה',fit:BoxFit.contain));
 }
-class Home extends StatefulWidget {class Home extends StatefulWidget {
+class Home extends StatefulWidget {
   final Store store; const Home({super.key,required this.store});
   @override State<Home> createState()=>_HomeState();
 }
@@ -305,7 +305,7 @@ class SongTile extends StatelessWidget{
     const SizedBox(width:12),Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text(song.title,style:const TextStyle(fontWeight:FontWeight.bold,fontSize:16)),const SizedBox(height:4),Text(song.style+' • '+(song.artist.isEmpty?'ללא אמן':song.artist),style:const TextStyle(color:soft,fontSize:12))])),Text(song.key,style:const TextStyle(color:chord,fontWeight:FontWeight.w800))
   ]))));
 }
-class Player extends StatefulWidget{class Player extends StatefulWidget{
+class Player extends StatefulWidget{
   final Store store; final Song song;
   const Player({super.key,required this.store,required this.song});
   @override State<Player> createState()=>_PlayerState();
