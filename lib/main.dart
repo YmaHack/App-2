@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
+import 'package:flutter/rendering.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:syncfusion_flutter_pdf/pdf.dart';
 
@@ -182,7 +183,7 @@ class _LibraryState extends State<Library>{
     Text('גודל גופן: '+widget.store.font.toStringAsFixed(0)),
     Slider(min:16,max:40,value:widget.store.font,onChanged:(v){setSheet((){});widget.store.settings(f:v);}),
     SwitchListTile(title:const Text('מצב במה'),value:widget.store.stage,onChanged:(v){setSheet((){});widget.store.settings(m:v);}),
-  ])));
+  ]))));
 }
 
 class Editor extends StatefulWidget{
@@ -269,7 +270,7 @@ class Dock extends StatelessWidget{
   @override Widget build(BuildContext c)=>Material(color:const Color(0xFF19191F),elevation:18,child:SafeArea(top:false,child:Padding(padding:const EdgeInsets.all(8),child:Column(mainAxisSize:MainAxisSize.min,children:[
     Row(children:[b('בית',verseColor,'verse'),const SizedBox(width:6),b('פזמון',chorusColor,'chorus'),const SizedBox(width:6),b('מעבר',bridgeColor,'bridge')]),
     Row(children:[IconButton.filled(tooltip:playing?'עצור':'הפעל',onPressed:onPlay,icon:Icon(playing?Icons.pause:Icons.play_arrow)),Expanded(child:Slider(min:5,max:80,value:speed.clamp(5,80),onChanged:onSpeed)),Text(speed.toStringAsFixed(0)),IconButton(tooltip:'חצי טון למטה',onPressed:()=>onTranspose(-1),icon:const Icon(Icons.remove_circle_outline)),Text(keyName,style:const TextStyle(color:chordColor,fontSize:19,fontWeight:FontWeight.w900)),IconButton(tooltip:'חצי טון למעלה',onPressed:()=>onTranspose(1),icon:const Icon(Icons.add_circle_outline))])
-  ])));
+  ]))));
 }
 
 class SongMap extends StatelessWidget{
