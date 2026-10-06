@@ -550,14 +550,14 @@ String smartStructure(String input){
 }
 Future<String> _ensureTessData()async{
   final base=await getApplicationDocumentsDirectory();
-  final dir=Directory('\${base.path}/bama_tessdata');
+  final dir=Directory('${base.path}/bama_tessdata');
   if(!await dir.exists())await dir.create(recursive:true);
   final client=HttpClient();
   try{
     for(final lang in ['heb','eng']){
-      final file=File('\${dir.path}/\${lang}.traineddata');
+      final file=File('${dir.path}/${lang}.traineddata');
       if(await file.exists()&&await file.length()>10000)continue;
-      final req=await client.getUrl(Uri.parse('https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/main/\${lang}.traineddata'));
+      final req=await client.getUrl(Uri.parse('https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/main/${lang}.traineddata'));
       final res=await req.close();
       if(res.statusCode!=200)throw Exception('לא ניתן להוריד מודל OCR '+lang);
       final data=await consolidateHttpClientResponseBytes(res);
@@ -573,7 +573,7 @@ Future<String> _ocrImageFile(File file)async{
 }
 Future<String> _ocrImageBytes(List<int> bytes,String extension)async{
   final dir=await getTemporaryDirectory();
-  final file=File('\${dir.path}/bama_scan_\${DateTime.now().microsecondsSinceEpoch}.$extension');
+  final file=File('${dir.path}/bama_scan_${DateTime.now().microsecondsSinceEpoch}.$extension');
   await file.writeAsBytes(bytes,flush:true);
   try{return await _ocrImageFile(file);}finally{if(await file.exists())await file.delete();}
 }
@@ -586,7 +586,7 @@ Future<String> _ocrPdf(List<int> bytes)async{
       try{
         final image=await page.render(width:page.width*2,height:page.height*2,format:pdfx.PdfPageImageFormat.png);
         final dir=await getTemporaryDirectory();
-        final file=File('\${dir.path}/bama_pdf_\${DateTime.now().microsecondsSinceEpoch}_$pageNo.png');
+        final file=File('${dir.path}/bama_pdf_${DateTime.now().microsecondsSinceEpoch}_$pageNo.png');
         if(image==null||image.bytes==null)continue;
         await file.writeAsBytes(image.bytes!,flush:true);
         try{out.add(await _ocrImageFile(file));}finally{if(await file.exists())await file.delete();}
