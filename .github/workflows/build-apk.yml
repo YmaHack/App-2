@@ -21,6 +21,9 @@ jobs:
       - name: Generate Android project files
         run: flutter create --no-pub --platforms=android --project-name=bama --org=com.ymahack .
 
+      - name: Remove generated sample tests
+        run: rm -rf test
+
       - name: Install dependencies
         run: flutter pub get
 
