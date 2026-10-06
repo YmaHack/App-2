@@ -318,10 +318,31 @@ class SectionView extends StatelessWidget{
   final Section section;final double size;final int tr;const SectionView({super.key,required this.section,required this.size,required this.tr});
   @override Widget build(BuildContext c)=>Container(margin:const EdgeInsets.only(bottom:16),padding:const EdgeInsets.fromLTRB(15,12,15,14),decoration:BoxDecoration(color:card,borderRadius:BorderRadius.circular(19),border:Border.all(color:section.color.withOpacity(.3))),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
     Row(children:[Container(width:5,height:22,color:section.color),const SizedBox(width:8),Text(section.name,style:TextStyle(color:section.color,fontWeight:FontWeight.w900))]),const SizedBox(height:10),
-    ...section.lines.map((line)=>Padding(padding:const EdgeInsets.only(bottom:7),child:Wrap(crossAxisAlignment:WrapCrossAlignment.end,children:parts(line).map((p)=>p.$2?Padding(padding:const EdgeInsets.symmetric(horizontal:2),child:Text(shift(p.$1,tr),style:TextStyle(color:chord,fontWeight:FontWeight.w900,fontSize:size*.72))):Text(p.$1,style:TextStyle(fontSize:size,height:1.55))).toList())))
+    ...section.lines.map((line)=>Padding(padding:const EdgeInsets.only(bottom:10),child:ChordAboveLine(line:line,size:size,tr:tr)))
   ]));
 }
 
+class ChordAboveLine extends StatelessWidget{
+  final String line;final double size;final int tr;
+  const ChordAboveLine({super.key,required this.line,required this.size,required this.tr});
+  @override Widget build(BuildContext c){
+    final matches=RegExp(r'\[([A-G](?:#|b)?(?:m|maj7|maj|m7|7|sus4|sus|dim|aug|add9|9|11|13)?(?:/[A-G](?:#|b)?)?)\]([^[]*)').allMatches(line).toList();
+    if(matches.isEmpty)return Text(line,style:TextStyle(fontSize:size,height:1.55));
+    final children=<Widget>[];
+    var last=0;
+    for(final m in matches){
+      if(m.start>last){children.add(Text(line.substring(last,m.start),style:TextStyle(fontSize:size,height:1.55)));}
+      final text=m.group(2)!;
+      children.add(Column(mainAxisSize:MainAxisSize.min,crossAxisAlignment:CrossAxisAlignment.start,children:[
+        Text(shift(m.group(1)!,tr),style:TextStyle(color:chord,fontWeight:FontWeight.w900,fontSize:size*.72,height:1.0)),
+        Text(text,style:TextStyle(fontSize:size,height:1.35)),
+      ]));
+      last=m.end;
+    }
+    if(last<line.length)children.add(Text(line.substring(last),style:TextStyle(fontSize:size,height:1.55)));
+    return Wrap(textDirection:TextDirection.rtl,crossAxisAlignment:WrapCrossAlignment.end,spacing:2,runSpacing:0,children:children);
+  }
+}
 final chordRx=RegExp(r'\[([A-G](?:#|b)?(?:m|maj7|maj|m7|7|sus4|sus|dim|aug|add9|9|11|13)?(?:/[A-G](?:#|b)?)?)\]|(?<![A-Za-z])([A-G](?:#|b)?(?:m|maj7|maj|m7|7|sus4|sus|dim|aug|add9|9|11|13)?(?:/[A-G](?:#|b)?)?)(?![A-Za-z])');
 List<(String,bool)> parts(String s){final a=<(String,bool)>[];int last=0;for(final m in chordRx.allMatches(s)){if(m.start>last)a.add((s.substring(last,m.start),false));a.add(((m.group(1)??m.group(2)??''),true));last=m.end;}if(last<s.length)a.add((s.substring(last),false));if(a.isEmpty)a.add((s,false));return a;}
 bool isChord(String s)=>RegExp(r'^[A-G](?:#|b)?(?:m|maj7|maj|m7|7|sus4|sus|dim|aug|add9|9|11|13)?(?:/[A-G](?:#|b)?)?$').hasMatch(s);
