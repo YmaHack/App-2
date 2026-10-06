@@ -450,6 +450,12 @@ bool looksLikeChordLine(String s){
  final n=t.where((x)=>isChord(x.replaceAll(RegExp(r'x\\d+$'),''))).length;
  return n/t.length>=.65;
 }
+String attachChords(List<TextWord> chords,List<TextWord> lyrics,bool heb){
+ final w=[...lyrics]..sort((a,b)=>heb?b.bounds.left.compareTo(a.bounds.left):a.bounds.left.compareTo(b.bounds.left));
+ final at=<int,List<String>>{};
+ for(final ch in chords){final x=ch.bounds.center.dx;int best=0;double dist=double.infinity;for(int k=0;k<w.length;k++){final z=w[k];final d=x<z.bounds.left?z.bounds.left-x:x>z.bounds.right?x-z.bounds.right:0.0;if(d<dist){dist=d;best=k;}}at.putIfAbsent(best,()=>[]).add(ch.text);}
+ final out=StringBuffer();for(int k=0;k<w.length;k++){if(k>0)out.write(' ');for(final c in at[k]??const <String>[]){out.write('[');out.write(c);out.write(']');}out.write(w[k].text);}return out.toString();
+}
 Future<String> smartExtractFile(String? path,List<int> bytes,String extension)async{
  final e=extension.toLowerCase();
  if(e=='txt')return normalize(utf8.decode(bytes,allowMalformed:true));
